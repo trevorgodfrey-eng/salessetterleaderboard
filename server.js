@@ -108,7 +108,7 @@ async function fetchDealsForPeriod(period) {
           { propertyName: "closedate", operator: "LTE", value: String(end) },
         ],
       }],
-      properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner"],
+      properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner", "hs_object_id"],
       limit: 100,
       ...(after ? { after } : {}),
     };
@@ -124,9 +124,10 @@ async function fetchDealsForPeriod(period) {
 
   const grouped = {};
   for (const deal of all) {
-    const rawOwner = deal.properties.setter_owner || "Unknown";
+    const dealDetail = await hsGet(`https://api.hubapi.com/crm/v3/objects/deals/${deal.id}?properties=setter_owner,up_front_cash_collected`);
+    const rawOwner = dealDetail.properties.setter_owner || "Unknown";
     const name = ownerMap[rawOwner] || rawOwner;
-    const amount = parseFloat(deal.properties.up_front_cash_collected) || 0;
+    const amount = parseFloat(dealDetail.properties.up_front_cash_collected) || 0;
     if (!grouped[name]) grouped[name] = { name, total: 0, deals: 0 };
     grouped[name].total += amount;
     grouped[name].deals += 1;
