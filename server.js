@@ -166,6 +166,17 @@ function scheduleHourlyCheck() {
   }, msUntilNextMinute);
 }
 
+app.get("/api/deal/:id", async (req, res) => {
+  try {
+    const data = await hsGet(`https://api.hubapi.com/crm/v3/objects/deals/${req.params.id}?properties=dealname,setter_owner,up_front_cash_collected,hubspot_owner_id&associations=contacts`);
+    const allProps = await hsGet(`https://api.hubapi.com/crm/v3/properties/deals`);
+    const setterProps = allProps.results.filter(p => p.name.toLowerCase().includes("setter"));
+    res.json({ deal: data.properties, setter_related_properties: setterProps.map(p => ({ name: p.name, label: p.label })) });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
 app.get("/api/debug", async (req, res) => {
   try {
     const pipelines = await getPipelines();
