@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Setter Leaderboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height: 100vh; padding: 1.5rem; }
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
+  .header-title { font-size: 28px; font-weight: 500; letter-spacing: -0.5px; }
+  .header-sub { font-size: 13px; color: #444; margin-top: 4px; }
+  .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .btn { padding: 6px 13px; font-size: 12px; border-radius: 8px; border: 0.5px solid #2a2a2a; background: transparent; color: #555; cursor: pointer; font-family: inherit; }
+  .btn:hover { color: #aaa; border-color: #444; }
+  .columns { display: flex; gap: 1.5rem; }
+  .col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .divider { width: 0.5px; background: #1a1a1a; flex-shrink: 0; }
+  .col-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+  .col-title { font-size: 20px; font-weight: 500; }
+  .col-status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; }
+  .podium { display: flex; align-items: flex-end; gap: 6px; }
+  .podium-item { display: flex; flex-direction: column; align-items: center; }
+  .podium-item.p1 { flex: 1.15; order: 1; }
+  .podium-item.p2 { flex: 1; order: 0; }
+  .podium-item.p3 { flex: 1; order: 2; }
+  .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 500; flex-shrink: 0; border: 1.5px solid; }
+  .rep-name { font-weight: 500; text-align: center; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+  .rep-total { font-weight: 500; letter-spacing: -0.3px; }
+  .rep-deals { font-size: 11px; color: #888; }
+  .podium-block { width: 100%; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; border-radius: 6px 6px 0 0; }
+  .podium-rank { font-weight: 500; }
+  .separator { border-top: 0.5px solid #222; margin-top: 0; }
+  .rest-list { display: flex; flex-direction: column; gap: 1px; margin: 8px 0; }
+  .rest-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 0.5px solid #1a1a1a; }
+  .rest-rank { font-size: 14px; color: #444; min-width: 28px; text-align: right; }
+  .rest-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; flex-shrink: 0; }
+  .rest-info { flex: 1; min-width: 0; }
+  .rest-name { font-size: 16px; font-weight: 500; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+  .rest-bar-track { height: 4px; background: #222; border-radius: 999px; }
+  .rest-bar-fill { height: 100%; background: #333; border-radius: 999px; transition: width 0.6s ease; }
+  .rest-total { font-size: 16px; font-weight: 500; color: #aaa; flex-shrink: 0; }
+  .totals { margin-top: auto; padding-top: 1rem; border-top: 0.5px solid #1e1e1e; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { background: #111; border-radius: 8px; padding: 10px 12px; }
+  .stat-label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 500; color: #ddd; letter-spacing: -0.3px; }
+  .empty { text-align: center; color: #444; font-size: 12px; padding: 2rem 0; }
+  @media (max-width: 600px) {
+    .columns { flex-direction: column; }
+    .divider { width: 100%; height: 0.5px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">Setter leaderboard</div>
+    <div class="header-sub">Closer Call Pipeline (Academy) · Closed Won · Up Front Cash Collected</div>
+  </div>
+  <button class="btn" onclick="manualRefresh()">↻ Refresh</button>
+</div>
+
+<div class="columns">
+  <div class="col" id="col-week"></div>
+  <div class="divider"></div>
+  <div class="col" id="col-month"></div>
+</div>
+
+<script>
+const AVATAR_PALETTES = [
+  ["#2a2a2a","#EF9F27"],["#1a2a1a","#5DCAA5"],["#2a1a1a","#F0997B"],
+  ["#1a1a2a","#AFA9EC"],["#1a2218","#97C459"],["#1a1f2a","#85B7EB"],
+];
+const PODIUM_CONFIG = [
+  { rank:0, order:1, height:110, accent:"#EF9F27", glow:"rgba(239,159,39,0.15)", label:"1st", sz:56, fsz:16, nameFsz:14, totalFsz:17 },
+  { rank:1, order:0, height:72,  accent:"#85B7EB", glow:"rgba(133,183,235,0.12)", label:"2nd", sz:44, fsz:13, nameFsz:12, totalFsz:14 },
+  { rank:2, order:2, height:52,  accent:"#F0997B", glow:"rgba(240,153,123,0.12)", label:"3rd", sz:44, fsz:13, nameFsz:12, totalFsz:14 },
+];
+
+let countdown = 0;
+let countdownTimer = null;
+
+function avatarColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AVATAR_PALETTES.length;
+  return AVATAR_PALETTES[h];
+}
+function initials(name) { return name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0,2); }
+function fmt(n) { return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n); }
+
+function renderColumn(colId, title, data, loading, error) {
+  const col = document.getElementById(colId);
+  const top = data?.[0]?.total || 1;
+  const totalCash = data ? data.reduce((s,r) => s+r.total, 0) : 0;
+  const totalDeals = data ? data.reduce((s,r) => s+r.deals, 0) : 0;
+  const mins = Math.floor(countdown/60);
+  const secs = String(countdown%60).padStart(2,"0");
+
+  let podiumHTML = "";
+  const podiumOrder = [PODIUM_CONFIG[1], PODIUM_CONFIG[0], PODIUM_CONFIG[2]];
+  podiumOrder.forEach(p => {
+    const rep = data?.[p.rank];
+    const [avBg, avFg] = rep ? avatarColor(rep.name) : ["#222","#555"];
+    podiumHTML += `
+      <div class="podium-item p${p.rank+1}" style="order:${p.order}">
+        ${rep ? `
+          <div class="avatar" style="width:${p.sz}px;height:${p.sz}px;font-size:${p.fsz}px;background:${avBg};border-color:${p.accent};color:${avFg};margin-bottom:8px">${initials(rep.name)}</div>
+          <p class="rep-name" style="font-size:${p.nameFsz}px;margin-bottom:2px">${rep.name}</p>
+          <p class="rep-total" style="font-size:${p.totalFsz}px;color:${p.accent};margin-bottom:8px">${fmt(rep.total)}</p>
+          <p class="rep-deals">${rep.deals} deal${rep.deals!==1?"s":""}</p>
+        ` : `<div style="height:${p.rank===0?100:80}px;display:flex;align-items:center"><p style="font-size:12px;color:#444">${loading?"…":"—"}</p></div>`}
+        <div class="podium-block" style="height:${p.height}px;background:${p.glow};border:0.5px solid ${p.accent}33">
+          <span class="podium-rank" style="font-size:${p.rank===0?22:16}px;color:${p.accent}">${p.label}</span>
+        </div>
+      </div>`;
+  });
+
+  let restHTML = "";
+  if (data && data.length > 3) {
+    data.slice(3).forEach((rep, i) => {
+      const pct = Math.round((rep.total / top) * 100);
+      const [avBg, avFg] = avatarColor(rep.name);
+      restHTML += `
+        <div class="rest-row">
+          <span class="rest-rank">#${i+4}</span>
+          <div class="rest-avatar" style="background:${avBg};color:${avFg}">${initials(rep.name)}</div>
+          <div class="rest-info">
+            <div class="rest-name">${rep.name}</div>
+            <div class="rest-bar-track"><div class="rest-bar-fill" style="width:${pct}%"></div></div>
+          </div>
+          <span class="rest-total">${fmt(rep.total)}</span>
+        </div>`;
+    });
+  }
+
+  col.innerHTML = `
+    <div class="col-header">
+      <span class="col-title">${title}</span>
+      <span class="col-status">
+        <span class="status-dot" style="background:${loading?"#EF9F27":"#1D9E75"}"></span>
+        ${loading ? "Fetching…" : `${mins}:${secs}`}
+      </span>
+    </div>
+    ${error ? `<div style="background:#1a0a0a;border:0.5px solid #5a1a1a;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#F09595">${error}</div>` : ""}
+    <div class="podium" style="display:flex">${podiumHTML}</div>
+    <div class="separator"></div>
+    ${restHTML ? `<div class="rest-list">${restHTML}</div>` : (!data && !loading ? `<div class="empty">—</div>` : "")}
+    ${data && data.length === 0 ? `<div class="empty">No deals found</div>` : ""}
+    <div class="totals">
+      <div class="stat-card"><div class="stat-label">Total collected</div><div class="stat-value">${data ? fmt(totalCash) : "—"}</div></div>
+      <div class="stat-card"><div class="stat-label">Deals closed</div><div class="stat-value">${data ? totalDeals : "—"}</div></div>
+    </div>`;
+}
+
+function startCountdown(seconds) {
+  countdown = seconds;
+  if (countdownTimer) clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    countdown = Math.max(0, countdown - 1);
+    if (countdown === 0) {
+      loadData();
+    } else {
+      renderColumn("col-week", "This week", window._weekData, false, window._weekError);
+      renderColumn("col-month", "This month", window._monthData, false, window._monthError);
+    }
+  }, 1000);
+}
+
+async function loadData() {
+  window._weekData = null; window._monthData = null;
+  window._weekError = null; window._monthError = null;
+  renderColumn("col-week", "This week", null, true, null);
+  renderColumn("col-month", "This month", null, true, null);
+
+  try {
+    const res = await fetch("/api/leaderboard");
+    const json = await res.json();
+    window._weekData = json.week;
+    window._monthData = json.month;
+    renderColumn("col-week", "This week", json.week, false, null);
+    renderColumn("col-month", "This month", json.month, false, null);
+    startCountdown(3600);
+  } catch(e) {
+    window._weekError = e.message;
+    window._monthError = e.message;
+    renderColumn("col-week", "This week", null, false, e.message);
+    renderColumn("col-month", "This month", null, false, e.message);
+  }
+}
+
+async function manualRefresh() {
+  await fetch("/api/refresh", { method: "POST" });
+  setTimeout(loadData, 2000);
+}
+
+loadData();
+</script>
+</body>
+</html>
