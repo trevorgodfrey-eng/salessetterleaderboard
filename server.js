@@ -95,7 +95,7 @@ async function fetchDealsForPeriod(period) {
   const { pipelineId, stageId } = await getClosedWonStageId(await getPipelines());
   const ownerMap = await getOwnerMap();
 
-  let all = [];
+  let allDeals = [];
   let after = undefined;
 
   while (true) {
@@ -108,13 +108,13 @@ async function fetchDealsForPeriod(period) {
           { propertyName: "closedate", operator: "LTE", value: String(end) },
         ],
       }],
-      properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner", "hs_object_id"],
+      properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner"],
       limit: 100,
       ...(after ? { after } : {}),
     };
 
     const data = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/search", body);
-    all = all.concat(data.results || []);
+    allDeals = allDeals.concat(data.results || []);
     if (data.paging?.next?.after) {
       after = data.paging.next.after;
     } else {
@@ -122,12 +122,19 @@ async function fetchDealsForPeriod(period) {
     }
   }
 
+  if (allDeals.length === 0) return [];
+
+  const dealIds = allDeals.map(d => d.id);
+  const batchData = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
+    inputs: dealIds.map(id => ({ id })),
+    properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner"],
+  });
+
   const grouped = {};
-  for (const deal of all) {
-    const dealDetail = await hsGet(`https://api.hubapi.com/crm/v3/objects/deals/${deal.id}?properties=setter_owner,up_front_cash_collected`);
-    const rawOwner = dealDetail.properties.setter_owner || "Unknown";
+  for (const deal of batchData.results || []) {
+    const rawOwner = deal.properties.setter_owner || "Unknown";
     const name = ownerMap[rawOwner] || rawOwner;
-    const amount = parseFloat(dealDetail.properties.up_front_cash_collected) || 0;
+    const amount = parseFloat(deal.properties.up_front_cash_collected) || 0;
     if (!grouped[name]) grouped[name] = { name, total: 0, deals: 0 };
     grouped[name].total += amount;
     grouped[name].deals += 1;
@@ -142,9 +149,10 @@ async function refreshCache() {
   console.log(`[${new Date().toISOString()}] Refreshing leaderboard...`);
   try {
     cache.week = await fetchDealsForPeriod("week");
-    console.log(`[${new Date().toISOString()}] Week done.`);
+    console.log(`[${new Date().toISOString()}] Week done: ${cache.week.length} setters`);
+    await new Promise(r => setTimeout(r, 2000));
     cache.month = await fetchDealsForPeriod("month");
-    console.log(`[${new Date().toISOString()}] Month done.`);
+    console.log(`[${new Date().toISOString()}] Month done: ${cache.month.length} setters`);
     cache.updatedAt = new Date().toISOString();
     console.log(`[${new Date().toISOString()}] Cache updated successfully.`);
   } catch (e) {
@@ -167,17 +175,6 @@ function scheduleHourlyCheck() {
   }, msUntilNextMinute);
 }
 
-app.get("/api/deal/:id", async (req, res) => {
-  try {
-    const data = await hsGet(`https://api.hubapi.com/crm/v3/objects/deals/${req.params.id}?properties=dealname,setter_owner,up_front_cash_collected,hubspot_owner_id&associations=contacts`);
-    const allProps = await hsGet(`https://api.hubapi.com/crm/v3/properties/deals`);
-    const setterProps = allProps.results.filter(p => p.name.toLowerCase().includes("setter"));
-    res.json({ deal: data.properties, setter_related_properties: setterProps.map(p => ({ name: p.name, label: p.label })) });
-  } catch (e) {
-    res.json({ error: e.message });
-  }
-});
-
 app.get("/api/debug", async (req, res) => {
   try {
     const pipelines = await getPipelines();
@@ -188,21 +185,34 @@ app.get("/api/debug", async (req, res) => {
         { propertyName: "dealstage", operator: "EQ", value: stageId },
       ]}],
       properties: ["dealname", "setter_owner", "up_front_cash_collected"],
-      limit: 10,
+      limit: 5,
+    });
+    const dealIds = data.results.map(d => d.id);
+    const batch = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
+      inputs: dealIds.map(id => ({ id })),
+      properties: ["dealname", "setter_owner", "up_front_cash_collected"],
     });
     const owners = await hsGet("https://api.hubapi.com/crm/v3/owners?limit=100");
     res.json({
-      sample_deals: data.results.map(d => ({
+      sample_deals: batch.results.map(d => ({
         name: d.properties.dealname,
         setter_owner_raw: d.properties.setter_owner,
+        amount: d.properties.up_front_cash_collected,
       })),
       owners: owners.results.map(o => ({
         id: o.id,
-        userId: o.userId,
-        email: o.email,
-        name: `${o.firstName} ${o.lastName}`,
+        name: `${o.firstName} ${o.lastName}`.trim(),
       })),
     });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
+app.get("/api/deal/:id", async (req, res) => {
+  try {
+    const data = await hsGet(`https://api.hubapi.com/crm/v3/objects/deals/${req.params.id}?properties=dealname,setter_owner,up_front_cash_collected,hubspot_owner_id`);
+    res.json({ deal: data.properties });
   } catch (e) {
     res.json({ error: e.message });
   }
