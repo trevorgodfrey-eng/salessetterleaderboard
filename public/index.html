@@ -68,7 +68,20 @@
 </div>
 
 <script>
-const AVATAR_PALETTES = [
+const EMOJIS = {
+  "christian wheeldon": "🎰",
+  "luis rodriguez": "⌚️",
+  "abbey christner": "💎",
+  "jeremy jimenez": "☄️",
+  "joey smith": "💪🏼",
+  "connor huseman": "🧲",
+  "freddy cornieles": "🚀",
+};
+
+function displayName(name) {
+  const emoji = EMOJIS[name.toLowerCase()];
+  return emoji ? `${name} ${emoji}` : name;
+}
   ["#2a2a2a","#EF9F27"],["#1a2a1a","#5DCAA5"],["#2a1a1a","#F0997B"],
   ["#1a1a2a","#AFA9EC"],["#1a2218","#97C459"],["#1a1f2a","#85B7EB"],
 ];
@@ -106,7 +119,7 @@ function renderColumn(colId, title, data, loading, error) {
       <div class="podium-item p${p.rank+1}" style="order:${p.order}">
         ${rep ? `
           <div class="avatar" style="width:${p.sz}px;height:${p.sz}px;font-size:${p.fsz}px;background:${avBg};border-color:${p.accent};color:${avFg};margin-bottom:8px">${initials(rep.name)}</div>
-          <p class="rep-name" style="font-size:${p.nameFsz}px;margin-bottom:2px">${rep.name}</p>
+          <p class="rep-name" style="font-size:${p.nameFsz}px;margin-bottom:2px">${displayName(rep.name)}</p>
           <p class="rep-total" style="font-size:${p.totalFsz}px;color:${p.accent};margin-bottom:8px">${fmt(rep.total)}</p>
           <p class="rep-deals">${rep.deals} deal${rep.deals!==1?"s":""}</p>
         ` : `<div style="height:${p.rank===0?100:80}px;display:flex;align-items:center"><p style="font-size:12px;color:#444">${loading?"…":"—"}</p></div>`}
@@ -126,7 +139,7 @@ function renderColumn(colId, title, data, loading, error) {
           <span class="rest-rank">#${i+4}</span>
           <div class="rest-avatar" style="background:${avBg};color:${avFg}">${initials(rep.name)}</div>
           <div class="rest-info">
-            <div class="rest-name">${rep.name}</div>
+            <div class="rest-name">${displayName(rep.name)}</div>
             <div class="rest-bar-track"><div class="rest-bar-fill" style="width:${pct}%"></div></div>
           </div>
           <span class="rest-total">${fmt(rep.total)}</span>
