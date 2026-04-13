@@ -27,7 +27,7 @@
   .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 500; flex-shrink: 0; border: 1.5px solid; }
   .rep-name { font-weight: 500; text-align: center; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
   .rep-total { font-weight: 500; letter-spacing: -0.3px; }
-  .rep-deals { font-size: 11px; color: #888; }
+  .rep-deals { font-size: 14px; color: #888; margin-bottom: 8px; }
   .podium-block { width: 100%; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; border-radius: 6px 6px 0 0; }
   .podium-rank { font-weight: 500; }
   .separator { border-top: 0.5px solid #222; margin-top: 0; }
@@ -80,15 +80,18 @@ const EMOJIS = {
 
 function displayName(name) {
   const emoji = EMOJIS[name.toLowerCase()];
-  return emoji ? `${name} ${emoji}` : name;
+  return emoji ? name + " " + emoji : name;
 }
+
+const AVATAR_PALETTES = [
   ["#2a2a2a","#EF9F27"],["#1a2a1a","#5DCAA5"],["#2a1a1a","#F0997B"],
   ["#1a1a2a","#AFA9EC"],["#1a2218","#97C459"],["#1a1f2a","#85B7EB"],
 ];
+
 const PODIUM_CONFIG = [
-  { rank:0, order:1, height:110, accent:"#EF9F27", glow:"rgba(239,159,39,0.15)", label:"1st", sz:56, fsz:16, nameFsz:14, totalFsz:17 },
-  { rank:1, order:0, height:72,  accent:"#85B7EB", glow:"rgba(133,183,235,0.12)", label:"2nd", sz:44, fsz:13, nameFsz:12, totalFsz:14 },
-  { rank:2, order:2, height:52,  accent:"#F0997B", glow:"rgba(240,153,123,0.12)", label:"3rd", sz:44, fsz:13, nameFsz:12, totalFsz:14 },
+  { rank:0, order:1, height:140, accent:"#EF9F27", glow:"rgba(239,159,39,0.15)", label:"1st", sz:90, fsz:28, nameFsz:22, totalFsz:32 },
+  { rank:1, order:0, height:95,  accent:"#85B7EB", glow:"rgba(133,183,235,0.12)", label:"2nd", sz:72, fsz:22, nameFsz:18, totalFsz:26 },
+  { rank:2, order:2, height:70,  accent:"#F0997B", glow:"rgba(240,153,123,0.12)", label:"3rd", sz:72, fsz:22, nameFsz:18, totalFsz:26 },
 ];
 
 let countdown = 0;
@@ -104,7 +107,7 @@ function fmt(n) { return new Intl.NumberFormat("en-US",{style:"currency",currenc
 
 function renderColumn(colId, title, data, loading, error) {
   const col = document.getElementById(colId);
-  const top = data?.[0]?.total || 1;
+  const top = data && data.length > 0 ? data[0].total : 1;
   const totalCash = data ? data.reduce((s,r) => s+r.total, 0) : 0;
   const totalDeals = data ? data.reduce((s,r) => s+r.deals, 0) : 0;
   const mins = Math.floor(countdown/60);
@@ -113,7 +116,7 @@ function renderColumn(colId, title, data, loading, error) {
   let podiumHTML = "";
   const podiumOrder = [PODIUM_CONFIG[1], PODIUM_CONFIG[0], PODIUM_CONFIG[2]];
   podiumOrder.forEach(p => {
-    const rep = data?.[p.rank];
+    const rep = data && data[p.rank] ? data[p.rank] : null;
     const [avBg, avFg] = rep ? avatarColor(rep.name) : ["#222","#555"];
     podiumHTML += `
       <div class="podium-item p${p.rank+1}" style="order:${p.order}">
@@ -158,7 +161,7 @@ function renderColumn(colId, title, data, loading, error) {
     ${error ? `<div style="background:#1a0a0a;border:0.5px solid #5a1a1a;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#F09595">${error}</div>` : ""}
     <div class="podium" style="display:flex">${podiumHTML}</div>
     <div class="separator"></div>
-    ${restHTML ? `<div class="rest-list">${restHTML}</div>` : (!data && !loading ? `<div class="empty">—</div>` : "")}
+    ${restHTML ? `<div class="rest-list">${restHTML}</div>` : ""}
     ${data && data.length === 0 ? `<div class="empty">No deals found</div>` : ""}
     <div class="totals">
       <div class="stat-card"><div class="stat-label">Total collected</div><div class="stat-value">${data ? fmt(totalCash) : "—"}</div></div>
@@ -180,20 +183,22 @@ function startCountdown(seconds) {
   }, 1000);
 }
 
-async function loadData() {
-  window._weekData = null; window._monthData = null;
-  window._weekError = null; window._monthError = null;
-  renderColumn("col-week", "This week", null, true, null);
-  renderColumn("col-month", "This month", null, true, null);
+let lastUpdatedAt = null;
 
+async function loadData() {
   try {
     const res = await fetch("/api/leaderboard");
     const json = await res.json();
-    window._weekData = json.week;
-    window._monthData = json.month;
-    renderColumn("col-week", "This week", json.week, false, null);
-    renderColumn("col-month", "This month", json.month, false, null);
-    startCountdown(900);
+    if (json.updatedAt !== lastUpdatedAt) {
+      lastUpdatedAt = json.updatedAt;
+      window._weekData = json.week;
+      window._monthData = json.month;
+      window._weekError = null;
+      window._monthError = null;
+      renderColumn("col-week", "This week", json.week, false, null);
+      renderColumn("col-month", "This month", json.month, false, null);
+      startCountdown(900);
+    }
   } catch(e) {
     window._weekError = e.message;
     window._monthError = e.message;
@@ -208,6 +213,7 @@ async function manualRefresh() {
 }
 
 loadData();
+setInterval(loadData, 60000);
 </script>
 </body>
 </html>
