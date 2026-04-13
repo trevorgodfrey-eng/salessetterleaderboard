@@ -17,7 +17,7 @@ function isWithinSchedule() {
   const now = new Date();
   const day = now.getDay();
   const hour = now.getHours();
-  return day >= 1 && day <= 5 && hour >= 8 && hour < 19;
+  return day >= 1 && day <= 5 && hour >= 8 && hour < 20;
 }
 
 function getPeriodRange(period) {
@@ -148,11 +148,22 @@ async function refreshCache() {
   isFetching = true;
   console.log(`[${new Date().toISOString()}] Refreshing leaderboard...`);
   try {
-    cache.week = await fetchDealsForPeriod("week");
-    console.log(`[${new Date().toISOString()}] Week done: ${cache.week.length} setters`);
-    await new Promise(r => setTimeout(r, 2000));
-    cache.month = await fetchDealsForPeriod("month");
-    console.log(`[${new Date().toISOString()}] Month done: ${cache.month.length} setters`);
+    const [weekResult, monthResult] = await Promise.allSettled([
+      fetchDealsForPeriod("week"),
+      fetchDealsForPeriod("month"),
+    ]);
+    if (weekResult.status === "fulfilled") {
+      cache.week = weekResult.value;
+      console.log(`[${new Date().toISOString()}] Week done: ${cache.week.length} setters`);
+    } else {
+      console.error(`[${new Date().toISOString()}] Week error:`, weekResult.reason.message);
+    }
+    if (monthResult.status === "fulfilled") {
+      cache.month = monthResult.value;
+      console.log(`[${new Date().toISOString()}] Month done: ${cache.month.length} setters`);
+    } else {
+      console.error(`[${new Date().toISOString()}] Month error:`, monthResult.reason.message);
+    }
     cache.updatedAt = new Date().toISOString();
     console.log(`[${new Date().toISOString()}] Cache updated successfully.`);
   } catch (e) {
@@ -168,7 +179,7 @@ function scheduleHourlyCheck() {
   setTimeout(() => {
     const check = () => {
       const d = new Date();
-      if (d.getMinutes() === 0 && isWithinSchedule()) refreshCache();
+      if (d.getMinutes() % 15 === 0 && isWithinSchedule()) refreshCache();
     };
     check();
     setInterval(check, 60000);
