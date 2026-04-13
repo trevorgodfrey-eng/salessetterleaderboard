@@ -180,7 +180,7 @@ async function loadData() {
     window._monthData = json.month;
     renderColumn("col-week", "This week", json.week, false, null);
     renderColumn("col-month", "This month", json.month, false, null);
-    startCountdown(3600);
+    startCountdown(900);
   } catch(e) {
     window._weekError = e.message;
     window._monthError = e.message;
