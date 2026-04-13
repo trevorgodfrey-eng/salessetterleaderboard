@@ -10,7 +10,6 @@
   .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
   .header-title { font-size: 28px; font-weight: 500; letter-spacing: -0.5px; }
   .header-sub { font-size: 13px; color: #444; margin-top: 4px; }
-  .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
   .btn { padding: 6px 13px; font-size: 12px; border-radius: 8px; border: 0.5px solid #2a2a2a; background: transparent; color: #555; cursor: pointer; font-family: inherit; }
   .btn:hover { color: #aaa; border-color: #444; }
   .columns { display: flex; gap: 1.5rem; }
@@ -24,7 +23,8 @@
   .podium-item.p1 { flex: 1.15; order: 1; }
   .podium-item.p2 { flex: 1; order: 0; }
   .podium-item.p3 { flex: 1; order: 2; }
-  .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 500; flex-shrink: 0; border: 1.5px solid; }
+  .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 500; flex-shrink: 0; border: 1.5px solid; overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .rep-name { font-weight: 500; text-align: center; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
   .rep-total { font-weight: 500; letter-spacing: -0.3px; }
   .rep-deals { font-size: 14px; color: #888; margin-bottom: 8px; }
@@ -34,7 +34,8 @@
   .rest-list { display: flex; flex-direction: column; gap: 1px; margin: 8px 0; }
   .rest-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 0.5px solid #1a1a1a; }
   .rest-rank { font-size: 14px; color: #444; min-width: 28px; text-align: right; }
-  .rest-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; flex-shrink: 0; }
+  .rest-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; flex-shrink: 0; overflow: hidden; }
+  .rest-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
   .rest-info { flex: 1; min-width: 0; }
   .rest-name { font-size: 16px; font-weight: 500; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
   .rest-bar-track { height: 4px; background: #222; border-radius: 999px; }
@@ -45,10 +46,7 @@
   .stat-label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
   .stat-value { font-size: 26px; font-weight: 500; color: #ddd; letter-spacing: -0.3px; }
   .empty { text-align: center; color: #444; font-size: 12px; padding: 2rem 0; }
-  @media (max-width: 600px) {
-    .columns { flex-direction: column; }
-    .divider { width: 100%; height: 0.5px; }
-  }
+  @media (max-width: 600px) { .columns { flex-direction: column; } .divider { width: 100%; height: 0.5px; } }
 </style>
 </head>
 <body>
@@ -78,10 +76,9 @@ const EMOJIS = {
   "freddy cornieles": "🚀",
 };
 
-function displayName(name) {
-  const emoji = EMOJIS[name.toLowerCase()];
-  return emoji ? name + " " + emoji : name;
-}
+const CUSTOM_AVATARS = {
+  "jeremy jimenez": "https://i.imgur.com/oz0kL7C.gif",
+};
 
 const AVATAR_PALETTES = [
   ["#2a2a2a","#EF9F27"],["#1a2a1a","#5DCAA5"],["#2a1a1a","#F0997B"],
@@ -97,12 +94,37 @@ const PODIUM_CONFIG = [
 let countdown = 0;
 let countdownTimer = null;
 
+function displayName(name) {
+  const emoji = EMOJIS[name.toLowerCase()];
+  return emoji ? name + " " + emoji : name;
+}
+
 function avatarColor(name) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AVATAR_PALETTES.length;
   return AVATAR_PALETTES[h];
 }
-function initials(name) { return name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0,2); }
+
+function avatarHTML(name, size, fontSize, accentColor) {
+  const customUrl = CUSTOM_AVATARS[name.toLowerCase()];
+  if (customUrl) {
+    return `<div class="avatar" style="width:${size}px;height:${size}px;border-color:${accentColor};margin-bottom:8px"><img src="${customUrl}" alt="${name}" /></div>`;
+  }
+  const [avBg, avFg] = avatarColor(name);
+  const inits = name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0,2);
+  return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${fontSize}px;background:${avBg};border-color:${accentColor};color:${avFg};margin-bottom:8px">${inits}</div>`;
+}
+
+function restAvatarHTML(name) {
+  const customUrl = CUSTOM_AVATARS[name.toLowerCase()];
+  if (customUrl) {
+    return `<div class="rest-avatar"><img src="${customUrl}" alt="${name}" /></div>`;
+  }
+  const [avBg, avFg] = avatarColor(name);
+  const inits = name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0,2);
+  return `<div class="rest-avatar" style="background:${avBg};color:${avFg}">${inits}</div>`;
+}
+
 function fmt(n) { return new Intl.NumberFormat("en-US",{style:"currency",currency:"USD",maximumFractionDigits:0}).format(n); }
 
 function renderColumn(colId, title, data, loading, error) {
@@ -117,11 +139,10 @@ function renderColumn(colId, title, data, loading, error) {
   const podiumOrder = [PODIUM_CONFIG[1], PODIUM_CONFIG[0], PODIUM_CONFIG[2]];
   podiumOrder.forEach(p => {
     const rep = data && data[p.rank] ? data[p.rank] : null;
-    const [avBg, avFg] = rep ? avatarColor(rep.name) : ["#222","#555"];
     podiumHTML += `
       <div class="podium-item p${p.rank+1}" style="order:${p.order}">
         ${rep ? `
-          <div class="avatar" style="width:${p.sz}px;height:${p.sz}px;font-size:${p.fsz}px;background:${avBg};border-color:${p.accent};color:${avFg};margin-bottom:8px">${initials(rep.name)}</div>
+          ${avatarHTML(rep.name, p.sz, p.fsz, p.accent)}
           <p class="rep-name" style="font-size:${p.nameFsz}px;margin-bottom:2px">${displayName(rep.name)}</p>
           <p class="rep-total" style="font-size:${p.totalFsz}px;color:${p.accent};margin-bottom:8px">${fmt(rep.total)}</p>
           <p class="rep-deals">${rep.deals} deal${rep.deals!==1?"s":""}</p>
@@ -136,11 +157,10 @@ function renderColumn(colId, title, data, loading, error) {
   if (data && data.length > 3) {
     data.slice(3).forEach((rep, i) => {
       const pct = Math.round((rep.total / top) * 100);
-      const [avBg, avFg] = avatarColor(rep.name);
       restHTML += `
         <div class="rest-row">
           <span class="rest-rank">#${i+4}</span>
-          <div class="rest-avatar" style="background:${avBg};color:${avFg}">${initials(rep.name)}</div>
+          ${restAvatarHTML(rep.name)}
           <div class="rest-info">
             <div class="rest-name">${displayName(rep.name)}</div>
             <div class="rest-bar-track"><div class="rest-bar-fill" style="width:${pct}%"></div></div>
@@ -154,7 +174,7 @@ function renderColumn(colId, title, data, loading, error) {
     <div class="col-header">
       <span class="col-title">${title}</span>
       <span class="col-status">
-        <span class="status-dot" style="background:${loading?"#EF9F27":"#1D9E75"}"></span>
+        <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${loading?"#EF9F27":"#1D9E75"};margin-right:5px"></span>
         ${loading ? "Fetching…" : `${mins}:${secs}`}
       </span>
     </div>
