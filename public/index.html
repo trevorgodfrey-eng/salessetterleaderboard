@@ -73,7 +73,8 @@ var EMOJIS = {
   "jeremy jimenez": "\u2604\uFE0F",
   "joey smith": "\uD83D\uDCAA\uD83C\uDFFE",
   "connor huseman": "\uD83E\uDDF2",
-  "freddy cornieles": "\uD83D\uDE80"
+  "freddy cornieles": "\uD83D\uDE80",
+  "sam hernandez": "\uD83E\uDD34\uD83C\uDFFE"
 };
 
 var CUSTOM_AVATARS = {
@@ -83,7 +84,8 @@ var CUSTOM_AVATARS = {
   "christian wheeldon": "https://media3.giphy.com/media/VguyBLjsztRBK/giphy.gif",
   "connor huseman": "https://media3.giphy.com/media/jUwpNzg9IcyrK/giphy.gif",
   "freddy cornieles": "https://media0.giphy.com/media/MFsqcBSoOKPbjtmvWz/giphy.gif",
-  "joey smith": "https://media3.giphy.com/media/zAqVg3rQMqbywPXc3i/giphy.gif"
+  "joey smith": "https://media3.giphy.com/media/zAqVg3rQMqbywPXc3i/giphy.gif",
+  "sam hernandez": "https://media3.giphy.com/media/5nFShZWwq3fdm/giphy.gif"
 };
 
 var AVATAR_PALETTES = [
@@ -216,14 +218,15 @@ function loadData() {
         window._monthError = null;
         renderColumn("col-week", "This week", json.week, false, null);
         renderColumn("col-month", "This month", json.month, false, null);
-        startCountdown(900);
       }
+      startCountdown(900);
     })
     .catch(function(e) {
       window._weekError = e.message;
       window._monthError = e.message;
       renderColumn("col-week", "This week", null, false, e.message);
       renderColumn("col-month", "This month", null, false, e.message);
+      startCountdown(900);
     });
 }
 
