@@ -140,11 +140,11 @@ function fmt(n) {
   return new Intl.NumberFormat("en-US", { style:"currency", currency:"USD", maximumFractionDigits:0 }).format(n);
 }
 
-function renderColumn(colId, title, data, loading, error) {
+function renderColumn(colId, title, data, totals, loading, error) {
   var col = document.getElementById(colId);
   var top = data && data.length > 0 ? data[0].total : 1;
-  var totalCash = data ? data.reduce(function(s,r){ return s+r.total; }, 0) : 0;
-  var totalDeals = data ? data.reduce(function(s,r){ return s+r.deals; }, 0) : 0;
+  var totalCash = totals ? totals.total : (data ? data.reduce(function(s,r){ return s+r.total; }, 0) : 0);
+  var totalDeals = totals ? totals.deals : (data ? data.reduce(function(s,r){ return s+r.deals; }, 0) : 0);
   var mins = Math.floor(countdown/60);
   var secs = String(countdown%60).padStart(2,"0");
 
@@ -202,8 +202,8 @@ function startCountdown(seconds) {
     if (countdown === 0) {
       loadData();
     } else {
-      renderColumn("col-week", "This week", window._weekData, false, window._weekError);
-      renderColumn("col-month", "This month", window._monthData, false, window._monthError);
+      renderColumn("col-week", "This week", window._weekData, window._weekTotals, false, window._weekError);
+      renderColumn("col-month", "This month", window._monthData, window._monthTotals, false, window._monthError);
     }
   }, 1000);
 }
@@ -216,18 +216,20 @@ function loadData() {
         lastUpdatedAt = json.updatedAt;
         window._weekData = json.week;
         window._monthData = json.month;
+        window._weekTotals = json.weekTotals;
+        window._monthTotals = json.monthTotals;
         window._weekError = null;
         window._monthError = null;
-        renderColumn("col-week", "This week", json.week, false, null);
-        renderColumn("col-month", "This month", json.month, false, null);
+        renderColumn("col-week", "This week", json.week, json.weekTotals, false, null);
+        renderColumn("col-month", "This month", json.month, json.monthTotals, false, null);
       }
       startCountdown(900);
     })
     .catch(function(e) {
       window._weekError = e.message;
       window._monthError = e.message;
-      renderColumn("col-week", "This week", null, false, e.message);
-      renderColumn("col-month", "This month", null, false, e.message);
+      renderColumn("col-week", "This week", null, null, false, e.message);
+      renderColumn("col-month", "This month", null, null, false, e.message);
       startCountdown(900);
     });
 }
