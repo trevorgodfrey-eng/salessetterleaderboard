@@ -17,7 +17,7 @@ function isWithinSchedule() {
   const now = new Date();
   const day = now.getDay();
   const hour = now.getHours();
-  return day >= 1 && day <= 5 && hour >= 8 && hour < 19;
+  return day >= 1 && day <= 5 && hour >= 8 && hour < 20;
 }
 
 function getPeriodRange(period) {
@@ -90,6 +90,8 @@ async function getOwnerMap() {
   return map;
 }
 
+const HIDDEN_OWNERS = ["90398715"];
+
 async function fetchDealsForPeriod(period) {
   const { start, end } = getPeriodRange(period);
   const { pipelineId, stageId } = await getClosedWonStageId(await getPipelines());
@@ -131,16 +133,25 @@ async function fetchDealsForPeriod(period) {
   });
 
   const grouped = {};
+  let hiddenTotal = 0;
+  let hiddenDeals = 0;
+
   for (const deal of batchData.results || []) {
     const rawOwner = deal.properties.setter_owner || "Unknown";
     const name = ownerMap[rawOwner] || rawOwner;
     const amount = parseFloat(deal.properties.up_front_cash_collected) || 0;
+    if (HIDDEN_OWNERS.includes(rawOwner)) {
+      hiddenTotal += amount;
+      hiddenDeals += 1;
+      continue;
+    }
     if (!grouped[name]) grouped[name] = { name, total: 0, deals: 0 };
     grouped[name].total += amount;
     grouped[name].deals += 1;
   }
 
-  return Object.values(grouped).sort((a, b) => b.total - a.total);
+  const leaderboard = Object.values(grouped).sort((a, b) => b.total - a.total);
+  return { leaderboard, hiddenTotal, hiddenDeals };
 }
 
 async function refreshCache() {
@@ -153,13 +164,15 @@ async function refreshCache() {
       fetchDealsForPeriod("month"),
     ]);
     if (weekResult.status === "fulfilled") {
-      cache.week = weekResult.value;
+      cache.week = weekResult.value.leaderboard;
+      cache.weekTotals = { total: weekResult.value.leaderboard.reduce((s,r) => s + r.total, 0) + weekResult.value.hiddenTotal, deals: weekResult.value.leaderboard.reduce((s,r) => s + r.deals, 0) + weekResult.value.hiddenDeals };
       console.log(`[${new Date().toISOString()}] Week done: ${cache.week.length} setters`);
     } else {
       console.error(`[${new Date().toISOString()}] Week error:`, weekResult.reason.message);
     }
     if (monthResult.status === "fulfilled") {
-      cache.month = monthResult.value;
+      cache.month = monthResult.value.leaderboard;
+      cache.monthTotals = { total: monthResult.value.leaderboard.reduce((s,r) => s + r.total, 0) + monthResult.value.hiddenTotal, deals: monthResult.value.leaderboard.reduce((s,r) => s + r.deals, 0) + monthResult.value.hiddenDeals };
       console.log(`[${new Date().toISOString()}] Month done: ${cache.month.length} setters`);
     } else {
       console.error(`[${new Date().toISOString()}] Month error:`, monthResult.reason.message);
