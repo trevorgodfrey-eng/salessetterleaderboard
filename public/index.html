@@ -43,8 +43,13 @@
   .rest-total { font-size: 16px; font-weight: 500; color: #aaa; flex-shrink: 0; }
   .totals { margin-top: auto; padding-top: 1rem; border-top: 0.5px solid #1e1e1e; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .stat-card { background: #111; border-radius: 8px; padding: 10px 12px; }
-  .stat-label { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
-  .stat-value { font-size: 26px; font-weight: 500; color: #ddd; letter-spacing: -0.3px; }
+  .stat-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .stat-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .stat-value { font-size: 20px; font-weight: 500; letter-spacing: -0.3px; }
+  .stat-goal { font-size: 11px; color: #444; }
+  .goal-track { height: 5px; background: #222; border-radius: 999px; margin-bottom: 4px; }
+  .goal-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; }
+  .goal-pct { font-size: 11px; color: #555; }
   .empty { text-align: center; color: #444; font-size: 12px; padding: 2rem 0; }
   @media (max-width: 600px) { .columns { flex-direction: column; } .divider { width: 100%; height: 0.5px; } }
 </style>
@@ -66,6 +71,11 @@
 </div>
 
 <script>
+var GOALS = {
+  week:  { cash: 25000,  deals: 25  },
+  month: { cash: 100000, deals: 100 }
+};
+
 var EMOJIS = {
   "christian wheeldon": "\uD83C\uDFB0",
   "luis rodriguez": "\u231A\uFE0F",
@@ -79,15 +89,15 @@ var EMOJIS = {
 };
 
 var CUSTOM_AVATARS = {
-  "jeremy jimenez": "https://i.imgur.com/oz0kL7C.gif",
-  "abbey christner": "https://i.imgflip.com/5xlk92.gif",
-  "luis rodriguez": "https://media2.giphy.com/media/1BhGf5CrA0B00SG79H/giphy.gif",
-  "christian wheeldon": "https://media3.giphy.com/media/VguyBLjsztRBK/giphy.gif",
-  "connor huseman": "https://media.giphy.com/media/xTiTnoORMNaANLYrHW/giphy.gif",
-  "freddy cornieles": "https://media0.giphy.com/media/MFsqcBSoOKPbjtmvWz/giphy.gif",
-  "joey smith": "https://media3.giphy.com/media/zAqVg3rQMqbywPXc3i/giphy.gif",
-  "sam hernandez": "https://media3.giphy.com/media/5nFShZWwq3fdm/giphy.gif",
-  "eddie hannigan": "https://media.tenor.com/RzVm4yzxQhkAAAAM/lil-uzi-uzi.gif"
+  "jeremy jimenez":    "https://i.imgur.com/oz0kL7C.gif",
+  "abbey christner":   "https://i.imgflip.com/5xlk92.gif",
+  "luis rodriguez":    "https://media2.giphy.com/media/1BhGf5CrA0B00SG79H/giphy.gif",
+  "christian wheeldon":"https://media3.giphy.com/media/VguyBLjsztRBK/giphy.gif",
+  "connor huseman":    "https://media.giphy.com/media/xTiTnoORMNaANLYrHW/giphy.gif",
+  "freddy cornieles":  "https://media0.giphy.com/media/MFsqcBSoOKPbjtmvWz/giphy.gif",
+  "joey smith":        "https://media3.giphy.com/media/zAqVg3rQMqbywPXc3i/giphy.gif",
+  "sam hernandez":     "https://media3.giphy.com/media/5nFShZWwq3fdm/giphy.gif",
+  "eddie hannigan":    "https://media.tenor.com/RzVm4yzxQhkAAAAM/lil-uzi-uzi.gif"
 };
 
 var AVATAR_PALETTES = [
@@ -140,9 +150,18 @@ function fmt(n) {
   return new Intl.NumberFormat("en-US", { style:"currency", currency:"USD", maximumFractionDigits:0 }).format(n);
 }
 
+function goalBar(value, goal) {
+  var pct = Math.min(100, Math.round((value / goal) * 100));
+  var color = pct >= 100 ? "#1D9E75" : pct >= 60 ? "#EF9F27" : "#85B7EB";
+  return '<div class="goal-track"><div class="goal-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+         '<div class="goal-pct">' + pct + '% of goal</div>';
+}
+
 function renderColumn(colId, title, data, totals, loading, error) {
   var col = document.getElementById(colId);
   var top = data && data.length > 0 ? data[0].total : 1;
+  var periodKey = title === "This week" ? "week" : "month";
+  var goals = GOALS[periodKey];
   var totalCash = totals ? totals.total : (data ? data.reduce(function(s,r){ return s+r.total; }, 0) : 0);
   var totalDeals = totals ? totals.deals : (data ? data.reduce(function(s,r){ return s+r.deals; }, 0) : 0);
   var mins = Math.floor(countdown/60);
@@ -189,8 +208,16 @@ function renderColumn(colId, title, data, totals, loading, error) {
     (restHTML ? '<div class="rest-list">' + restHTML + '</div>' : '') +
     (data && data.length === 0 ? '<div class="empty">No deals found</div>' : '') +
     '<div class="totals">' +
-      '<div class="stat-card"><div class="stat-label">Total collected</div><div class="stat-value">' + (data ? fmt(totalCash) : "-") + '</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Deals closed</div><div class="stat-value">' + (data ? totalDeals : "-") + '</div></div>' +
+      '<div class="stat-card">' +
+        '<div class="stat-label">Cash Collected</div>' +
+        '<div class="stat-row"><span class="stat-value" style="color:#1D9E75">' + (data ? fmt(totalCash) : "-") + '</span><span class="stat-goal">goal ' + fmt(goals.cash) + '</span></div>' +
+        (data ? goalBar(totalCash, goals.cash) : '') +
+      '</div>' +
+      '<div class="stat-card">' +
+        '<div class="stat-label">Deals Closed</div>' +
+        '<div class="stat-row"><span class="stat-value" style="color:#85B7EB">' + (data ? totalDeals : "-") + '</span><span class="stat-goal">goal ' + goals.deals + '</span></div>' +
+        (data ? goalBar(totalDeals, goals.deals) : '') +
+      '</div>' +
     '</div>';
 }
 
