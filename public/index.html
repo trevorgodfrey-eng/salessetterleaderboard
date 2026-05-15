@@ -42,14 +42,14 @@
   .rest-bar-fill { height: 100%; background: #333; border-radius: 999px; transition: width 0.6s ease; }
   .rest-total { font-size: 16px; font-weight: 500; color: #aaa; flex-shrink: 0; }
   .totals { margin-top: auto; padding-top: 1rem; border-top: 0.5px solid #1e1e1e; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .stat-card { background: #111; border-radius: 8px; padding: 10px 12px; }
-  .stat-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
-  .stat-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
-  .stat-value { font-size: 20px; font-weight: 500; letter-spacing: -0.3px; }
-  .stat-goal { font-size: 11px; color: #444; }
-  .goal-track { height: 5px; background: #222; border-radius: 999px; margin-bottom: 4px; }
-  .goal-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; }
-  .goal-pct { font-size: 11px; color: #555; }
+  .stat-card { background: #111; border-radius: 10px; padding: 14px 16px; border: 0.5px solid #222; }
+  .stat-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .stat-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .stat-value { font-size: 28px; font-weight: 500; letter-spacing: -0.5px; }
+  .stat-goal { font-size: 12px; color: #444; }
+  .goal-track { height: 6px; background: #1e1e1e; border-radius: 999px; margin-bottom: 6px; overflow: hidden; }
+  .goal-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; box-shadow: 0 0 8px currentColor; }
+  .goal-pct { font-size: 12px; font-weight: 500; }
   .empty { text-align: center; color: #444; font-size: 12px; padding: 2rem 0; }
   @media (max-width: 600px) { .columns { flex-direction: column; } .divider { width: 100%; height: 0.5px; } }
 </style>
@@ -150,11 +150,11 @@ function fmt(n) {
   return new Intl.NumberFormat("en-US", { style:"currency", currency:"USD", maximumFractionDigits:0 }).format(n);
 }
 
-function goalBar(value, goal) {
+function goalBar(value, goal, color) {
   var pct = Math.min(100, Math.round((value / goal) * 100));
-  var color = pct >= 100 ? "#1D9E75" : pct >= 60 ? "#EF9F27" : "#85B7EB";
-  return '<div class="goal-track"><div class="goal-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
-         '<div class="goal-pct">' + pct + '% of goal</div>';
+  var barColor = pct >= 100 ? "#1D9E75" : pct >= 60 ? "#EF9F27" : color;
+  return '<div class="goal-track"><div class="goal-fill" style="width:' + pct + '%;background:' + barColor + ';color:' + barColor + '"></div></div>' +
+         '<div class="goal-pct" style="color:' + barColor + '">' + pct + '% of goal</div>';
 }
 
 function renderColumn(colId, title, data, totals, loading, error) {
@@ -211,12 +211,12 @@ function renderColumn(colId, title, data, totals, loading, error) {
       '<div class="stat-card">' +
         '<div class="stat-label">Cash Collected</div>' +
         '<div class="stat-row"><span class="stat-value" style="color:#1D9E75">' + (data ? fmt(totalCash) : "-") + '</span><span class="stat-goal">goal ' + fmt(goals.cash) + '</span></div>' +
-        (data ? goalBar(totalCash, goals.cash) : '') +
+        (data ? goalBar(totalCash, goals.cash, "#1D9E75") : '') +
       '</div>' +
       '<div class="stat-card">' +
         '<div class="stat-label">Deals Closed</div>' +
         '<div class="stat-row"><span class="stat-value" style="color:#85B7EB">' + (data ? totalDeals : "-") + '</span><span class="stat-goal">goal ' + goals.deals + '</span></div>' +
-        (data ? goalBar(totalDeals, goals.deals) : '') +
+        (data ? goalBar(totalDeals, goals.deals, "#85B7EB") : '') +
       '</div>' +
     '</div>';
 }
