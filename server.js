@@ -90,7 +90,7 @@ async function getOwnerMap() {
   return map;
 }
 
-const HIDDEN_OWNERS = ["90398715"];
+const HIDDEN_OWNERS = ["90398715", "84870321", "92723181", "93371701"];
 
 async function fetchDealsForPeriod(period) {
   const { start, end } = getPeriodRange(period);
