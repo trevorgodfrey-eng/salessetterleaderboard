@@ -64,19 +64,20 @@ async function getPipelines() {
   return data.results || [];
 }
 
-async function getClosedWonStageId(pipelines) {
+async function getClosedWonStageIds(pipelines) {
   const pipeline = pipelines.find((p) =>
     p.label.toLowerCase().includes("closer call pipeline (academy)") ||
     p.label.toLowerCase().includes("closer call")
   );
   if (!pipeline) throw new Error("Could not find 'Closer Call Pipeline (Academy)' pipeline");
-  const stage = pipeline.stages.find((s) =>
+  const stages = pipeline.stages.filter((s) =>
     s.label.toLowerCase().includes("closed won") ||
     s.metadata?.probability === "1.0" ||
     s.metadata?.isClosed === "true"
   );
-  if (!stage) throw new Error("Could not find Closed Won stage in pipeline");
-  return { pipelineId: pipeline.id, stageId: stage.id };
+  if (!stages.length) throw new Error("Could not find any Closed Won stages in pipeline");
+  console.log("Matched stages:", stages.map(s => s.label + " (" + s.id + ")"));
+  return { pipelineId: pipeline.id, stageIds: stages.map(s => s.id) };
 }
 
 async function getOwnerMap() {
@@ -94,7 +95,7 @@ const HIDDEN_OWNERS = ["90398715", "84870321", "92723181", "93371701"];
 
 async function fetchDealsForPeriod(period) {
   const { start, end } = getPeriodRange(period);
-  const { pipelineId, stageId } = await getClosedWonStageId(await getPipelines());
+  const { pipelineId, stageIds } = await getClosedWonStageIds(await getPipelines());
   const ownerMap = await getOwnerMap();
 
   let allDeals = [];
@@ -102,14 +103,14 @@ async function fetchDealsForPeriod(period) {
 
   while (true) {
     const body = {
-      filterGroups: [{
+      filterGroups: stageIds.map(stageId => ({
         filters: [
           { propertyName: "pipeline", operator: "EQ", value: pipelineId },
           { propertyName: "dealstage", operator: "EQ", value: stageId },
           { propertyName: "closedate", operator: "GTE", value: String(start) },
           { propertyName: "closedate", operator: "LTE", value: String(end) },
         ],
-      }],
+      })),
       properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner"],
       limit: 100,
       ...(after ? { after } : {}),
@@ -202,12 +203,14 @@ function scheduleHourlyCheck() {
 app.get("/api/debug", async (req, res) => {
   try {
     const pipelines = await getPipelines();
-    const { pipelineId, stageId } = await getClosedWonStageId(pipelines);
+    const { pipelineId, stageIds } = await getClosedWonStageIds(pipelines);
     const data = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/search", {
-      filterGroups: [{ filters: [
-        { propertyName: "pipeline", operator: "EQ", value: pipelineId },
-        { propertyName: "dealstage", operator: "EQ", value: stageId },
-      ]}],
+      filterGroups: stageIds.map(stageId => ({
+        filters: [
+          { propertyName: "pipeline", operator: "EQ", value: pipelineId },
+          { propertyName: "dealstage", operator: "EQ", value: stageId },
+        ],
+      })),
       properties: ["dealname", "setter_owner", "up_front_cash_collected"],
       limit: 5,
     });
