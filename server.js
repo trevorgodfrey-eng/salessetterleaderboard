@@ -77,7 +77,7 @@ async function getClosedWonStageIds(pipelines) {
   );
   if (!stages.length) throw new Error("Could not find any Closed Won stages in pipeline");
   console.log("Matched stages:", stages.map(s => s.label + " (" + s.id + ")"));
-  return { pipelineId: pipeline.id, stageIds: stages.map(s => s.id) };
+  return { pipelineId: pipeline.id, stageIds: new Set(stages.map(s => s.id)) };
 }
 
 async function getOwnerMap() {
@@ -103,14 +103,13 @@ async function fetchDealsForPeriod(period) {
 
   while (true) {
     const body = {
-      filterGroups: stageIds.map(stageId => ({
+      filterGroups: [{
         filters: [
           { propertyName: "pipeline", operator: "EQ", value: pipelineId },
-          { propertyName: "dealstage", operator: "EQ", value: stageId },
           { propertyName: "closedate", operator: "GTE", value: String(start) },
           { propertyName: "closedate", operator: "LTE", value: String(end) },
         ],
-      })),
+      }],
       properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner"],
       limit: 100,
       ...(after ? { after } : {}),
@@ -130,7 +129,7 @@ async function fetchDealsForPeriod(period) {
   const dealIds = allDeals.map(d => d.id);
   const batchData = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
     inputs: dealIds.map(id => ({ id })),
-    properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner"],
+    properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner", "dealstage"],
   });
 
   const grouped = {};
@@ -138,6 +137,7 @@ async function fetchDealsForPeriod(period) {
   let hiddenDeals = 0;
 
   for (const deal of batchData.results || []) {
+    if (!stageIds.has(deal.properties.dealstage)) continue;
     const rawOwner = deal.properties.setter_owner || "Unknown";
     const name = ownerMap[rawOwner] || rawOwner;
     const amount = parseFloat(deal.properties.up_front_cash_collected) || 0;
