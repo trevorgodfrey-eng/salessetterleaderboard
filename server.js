@@ -71,9 +71,7 @@ async function getClosedWonStageIds(pipelines) {
   );
   if (!pipeline) throw new Error("Could not find 'Closer Call Pipeline (Academy)' pipeline");
   const stages = pipeline.stages.filter((s) =>
-    s.label.toLowerCase().includes("closed won") ||
-    s.metadata?.probability === "1.0" ||
-    s.metadata?.isClosed === "true"
+    s.label.toLowerCase().includes("closed won")
   );
   if (!stages.length) throw new Error("Could not find any Closed Won stages in pipeline");
   console.log("Matched stages:", stages.map(s => s.label + " (" + s.id + ")"));
@@ -164,19 +162,25 @@ async function refreshCache() {
       fetchDealsForPeriod("week"),
       fetchDealsForPeriod("month"),
     ]);
-    if (weekResult.status === "fulfilled") {
-      cache.week = weekResult.value.leaderboard;
-      cache.weekTotals = { total: weekResult.value.leaderboard.reduce((s,r) => s + r.total, 0) + weekResult.value.hiddenTotal, deals: weekResult.value.leaderboard.reduce((s,r) => s + r.deals, 0) + weekResult.value.hiddenDeals };
+    if (weekResult.status === "fulfilled" && weekResult.value) {
+      cache.week = weekResult.value.leaderboard || [];
+      cache.weekTotals = {
+        total: (weekResult.value.leaderboard || []).reduce((s,r) => s + r.total, 0) + (weekResult.value.hiddenTotal || 0),
+        deals: (weekResult.value.leaderboard || []).reduce((s,r) => s + r.deals, 0) + (weekResult.value.hiddenDeals || 0)
+      };
       console.log(`[${new Date().toISOString()}] Week done: ${cache.week.length} setters`);
     } else {
-      console.error(`[${new Date().toISOString()}] Week error:`, weekResult.reason.message);
+      console.error(`[${new Date().toISOString()}] Week error:`, weekResult.reason?.message);
     }
-    if (monthResult.status === "fulfilled") {
-      cache.month = monthResult.value.leaderboard;
-      cache.monthTotals = { total: monthResult.value.leaderboard.reduce((s,r) => s + r.total, 0) + monthResult.value.hiddenTotal, deals: monthResult.value.leaderboard.reduce((s,r) => s + r.deals, 0) + monthResult.value.hiddenDeals };
+    if (monthResult.status === "fulfilled" && monthResult.value) {
+      cache.month = monthResult.value.leaderboard || [];
+      cache.monthTotals = {
+        total: (monthResult.value.leaderboard || []).reduce((s,r) => s + r.total, 0) + (monthResult.value.hiddenTotal || 0),
+        deals: (monthResult.value.leaderboard || []).reduce((s,r) => s + r.deals, 0) + (monthResult.value.hiddenDeals || 0)
+      };
       console.log(`[${new Date().toISOString()}] Month done: ${cache.month.length} setters`);
     } else {
-      console.error(`[${new Date().toISOString()}] Month error:`, monthResult.reason.message);
+      console.error(`[${new Date().toISOString()}] Month error:`, monthResult.reason?.message);
     }
     cache.updatedAt = new Date().toISOString();
     console.log(`[${new Date().toISOString()}] Cache updated successfully.`);
