@@ -23,6 +23,8 @@ function isWithinSchedule() {
 function getPeriodRange(period) {
   const now = new Date();
   const start = new Date();
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
   if (period === "week") {
     const day = now.getDay();
     const diffToMonday = (day === 0 ? -6 : 1 - day);
@@ -32,7 +34,7 @@ function getPeriodRange(period) {
     start.setDate(1);
     start.setHours(0, 0, 0, 0);
   }
-  return { start: start.getTime(), end: now.getTime() };
+  return { start: start.getTime(), end: end.getTime() };
 }
 
 async function hsGet(url) {
