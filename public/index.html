@@ -3,15 +3,21 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Setter Leaderboard</title>
+<title>MLP Leaderboard</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height: 100vh; padding: 1.5rem; }
   .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
+  .header-left { display: flex; flex-direction: column; gap: 4px; }
   .header-title { font-size: 28px; font-weight: 500; letter-spacing: -0.5px; }
-  .header-sub { font-size: 13px; color: #444; margin-top: 4px; }
-  .btn { padding: 6px 13px; font-size: 12px; border-radius: 8px; border: 0.5px solid #2a2a2a; background: transparent; color: #555; cursor: pointer; font-family: inherit; }
+  .header-sub { font-size: 13px; color: #444; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .btn { padding: 6px 13px; font-size: 12px; border-radius: 8px; border: 0.5px solid #2a2a2a; background: transparent; color: #555; cursor: pointer; font-family: inherit; transition: all 0.15s; }
   .btn:hover { color: #aaa; border-color: #444; }
+  .btn-toggle { padding: 7px 16px; font-size: 13px; border-radius: 8px; border: 0.5px solid #333; background: #111; color: #aaa; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .btn-toggle.active { background: #1a1a1a; color: #fff; border-color: #555; }
+  .rotate-bar { height: 2px; background: #1a1a1a; border-radius: 999px; margin-bottom: 1.5rem; overflow: hidden; }
+  .rotate-fill { height: 100%; border-radius: 999px; transition: width 1s linear; }
   .columns { display: flex; gap: 1.5rem; }
   .col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .divider { width: 0.5px; background: #1a1a1a; flex-shrink: 0; }
@@ -48,31 +54,49 @@
   .stat-value { font-size: 28px; font-weight: 500; letter-spacing: -0.5px; }
   .stat-goal { font-size: 12px; color: #444; }
   .goal-track { height: 6px; background: #1e1e1e; border-radius: 999px; margin-bottom: 6px; overflow: hidden; }
-  .goal-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; box-shadow: 0 0 8px currentColor; }
+  .goal-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; }
   .goal-pct { font-size: 12px; font-weight: 500; }
   .empty { text-align: center; color: #444; font-size: 12px; padding: 2rem 0; }
+  .dashboard { display: none; }
+  .dashboard.active { display: block; }
   @media (max-width: 600px) { .columns { flex-direction: column; } .divider { width: 100%; height: 0.5px; } }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <div>
-    <div class="header-title">Setter leaderboard</div>
+  <div class="header-left">
+    <div class="header-title" id="board-title">Setter leaderboard</div>
     <div class="header-sub">Closer Call Pipeline (Academy) · Closed Won · Up Front Cash Collected</div>
   </div>
-  <button class="btn" onclick="manualRefresh()">&#x21bb; Refresh</button>
+  <div class="header-right">
+    <button class="btn-toggle active" id="btn-setter" onclick="switchBoard('setter')">Setters</button>
+    <button class="btn-toggle" id="btn-closer" onclick="switchBoard('closer')">Closers</button>
+    <button class="btn" onclick="manualRefresh()">&#x21bb;</button>
+  </div>
 </div>
 
-<div class="columns">
-  <div class="col" id="col-week"></div>
-  <div class="divider"></div>
-  <div class="col" id="col-month"></div>
+<div class="rotate-bar"><div class="rotate-fill" id="rotate-fill" style="width:100%"></div></div>
+
+<div class="dashboard active" id="dash-setter">
+  <div class="columns">
+    <div class="col" id="setter-col-week"></div>
+    <div class="divider"></div>
+    <div class="col" id="setter-col-month"></div>
+  </div>
+</div>
+
+<div class="dashboard" id="dash-closer">
+  <div class="columns">
+    <div class="col" id="closer-col-week"></div>
+    <div class="divider"></div>
+    <div class="col" id="closer-col-month"></div>
+  </div>
 </div>
 
 <script>
 var GOALS = {
-  week:  { cash: 32500,  deals: 25  },
+  week:  { cash: 32500, deals: 25  },
   month: { cash: 100000, deals: 100 }
 };
 
@@ -104,8 +128,8 @@ var CUSTOM_AVATARS = {
   "sam hernandez":     "https://media3.giphy.com/media/5nFShZWwq3fdm/giphy.gif",
   "eddie hannigan":    "https://media.tenor.com/RzVm4yzxQhkAAAAM/lil-uzi-uzi.gif",
   "jaima carson":      "https://media.giphy.com/media/UTCiBuRa7UnjW6eTX9/giphy.gif",
-  "camron priest":     "https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExb2g1NGRiazRtN3dnM3RveTY4MjBkcGdqdDdvYWN3dDlzeWs4c2x1ayZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/hp8nWrUnYwgnl7YkJB/giphy.gif",
-  "luis izquierdo":    "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjFyYTAwYzN5azRld3VvODRjN3pyOWpoZzRlbngyaGg0dG1iZDl2diZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/gTURHJs4e2Ies/giphy.gif",
+  "camron priest":     "https://media2.giphy.com/media/hp8nWrUnYwgnl7YkJB/giphy.gif",
+  "luis izquierdo":    "https://media0.giphy.com/media/gTURHJs4e2Ies/giphy.gif",
   "bailey carpenter":  "https://media.giphy.com/media/blSTtZehjAZ8I/giphy.gif",
   "eric jankowitz":    "https://media.giphy.com/media/ASuN9noy1pySV05Qfe/giphy.gif"
 };
@@ -121,9 +145,12 @@ var PODIUM_CONFIG = [
   { rank:2, order:2, height:70,  accent:"#F0997B", glow:"rgba(240,153,123,0.12)", label:"3rd", sz:72, fsz:22, nameFsz:18, totalFsz:26 }
 ];
 
-var countdown = 0;
-var countdownTimer = null;
+var currentBoard = "setter";
+var rotateSecondsLeft = 300;
+var rotateTimer = null;
+var dataRefreshTimer = null;
 var lastUpdatedAt = null;
+var cachedData = null;
 
 function displayName(name) {
   var emoji = EMOJIS[name.toLowerCase()];
@@ -138,9 +165,7 @@ function avatarColor(name) {
 
 function avatarHTML(name, size, fontSize, accentColor) {
   var url = CUSTOM_AVATARS[name.toLowerCase()];
-  if (url) {
-    return '<div class="avatar" style="width:' + size + 'px;height:' + size + 'px;border-color:' + accentColor + ';margin-bottom:8px"><img src="' + url + '" alt="' + name + '" /></div>';
-  }
+  if (url) return '<div class="avatar" style="width:' + size + 'px;height:' + size + 'px;border-color:' + accentColor + ';margin-bottom:8px"><img src="' + url + '" alt="' + name + '" /></div>';
   var colors = avatarColor(name);
   var inits = name.split(" ").map(function(p){ return p[0]; }).join("").toUpperCase().slice(0,2);
   return '<div class="avatar" style="width:' + size + 'px;height:' + size + 'px;font-size:' + fontSize + 'px;background:' + colors[0] + ';border-color:' + accentColor + ';color:' + colors[1] + ';margin-bottom:8px">' + inits + '</div>';
@@ -148,9 +173,7 @@ function avatarHTML(name, size, fontSize, accentColor) {
 
 function restAvatarHTML(name) {
   var url = CUSTOM_AVATARS[name.toLowerCase()];
-  if (url) {
-    return '<div class="rest-avatar"><img src="' + url + '" alt="' + name + '" /></div>';
-  }
+  if (url) return '<div class="rest-avatar"><img src="' + url + '" alt="' + name + '" /></div>';
   var colors = avatarColor(name);
   var inits = name.split(" ").map(function(p){ return p[0]; }).join("").toUpperCase().slice(0,2);
   return '<div class="rest-avatar" style="background:' + colors[0] + ';color:' + colors[1] + '">' + inits + '</div>';
@@ -163,19 +186,18 @@ function fmt(n) {
 function goalBar(value, goal, color) {
   var pct = Math.min(100, Math.round((value / goal) * 100));
   var barColor = pct >= 100 ? "#1D9E75" : pct >= 60 ? "#EF9F27" : color;
-  return '<div class="goal-track"><div class="goal-fill" style="width:' + pct + '%;background:' + barColor + ';color:' + barColor + '"></div></div>' +
+  return '<div class="goal-track"><div class="goal-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
          '<div class="goal-pct" style="color:' + barColor + '">' + pct + '% of goal</div>';
 }
 
-function renderColumn(colId, title, data, totals, loading, error) {
+function renderColumn(colId, title, data, totals) {
   var col = document.getElementById(colId);
+  if (!col) return;
   var top = data && data.length > 0 ? data[0].total : 1;
   var periodKey = title === "This week" ? "week" : "month";
   var goals = GOALS[periodKey];
   var totalCash = totals ? totals.total : (data ? data.reduce(function(s,r){ return s+r.total; }, 0) : 0);
   var totalDeals = totals ? totals.deals : (data ? data.reduce(function(s,r){ return s+r.deals; }, 0) : 0);
-  var mins = Math.floor(countdown/60);
-  var secs = String(countdown%60).padStart(2,"0");
 
   var podiumHTML = "";
   var podiumOrder = [PODIUM_CONFIG[1], PODIUM_CONFIG[0], PODIUM_CONFIG[2]];
@@ -188,7 +210,7 @@ function renderColumn(colId, title, data, totals, loading, error) {
       podiumHTML += '<p class="rep-total" style="font-size:' + p.totalFsz + 'px;color:' + p.accent + ';margin-bottom:8px">' + fmt(rep.total) + '</p>';
       podiumHTML += '<p class="rep-deals">' + rep.deals + ' deal' + (rep.deals !== 1 ? 's' : '') + '</p>';
     } else {
-      podiumHTML += '<div style="height:' + (p.rank===0?100:80) + 'px;display:flex;align-items:center"><p style="font-size:12px;color:#444">' + (loading ? '...' : '-') + '</p></div>';
+      podiumHTML += '<div style="height:' + (p.rank===0?100:80) + 'px;display:flex;align-items:center"><p style="font-size:12px;color:#444">-</p></div>';
     }
     podiumHTML += '<div class="podium-block" style="height:' + p.height + 'px;background:' + p.glow + ';border:0.5px solid ' + p.accent + '33">';
     podiumHTML += '<span class="podium-rank" style="font-size:' + (p.rank===0?22:16) + 'px;color:' + p.accent + '">' + p.label + '</span></div></div>';
@@ -198,8 +220,7 @@ function renderColumn(colId, title, data, totals, loading, error) {
   if (data && data.length > 3) {
     data.slice(3).forEach(function(rep, i) {
       var pct = Math.round((rep.total / top) * 100);
-      restHTML += '<div class="rest-row">';
-      restHTML += '<span class="rest-rank">#' + (i+4) + '</span>';
+      restHTML += '<div class="rest-row"><span class="rest-rank">#' + (i+4) + '</span>';
       restHTML += restAvatarHTML(rep.name);
       restHTML += '<div class="rest-info"><div class="rest-name">' + displayName(rep.name) + '</div>';
       restHTML += '<div class="rest-bar-track"><div class="rest-bar-fill" style="width:' + pct + '%"></div></div></div>';
@@ -208,39 +229,55 @@ function renderColumn(colId, title, data, totals, loading, error) {
   }
 
   col.innerHTML =
-    '<div class="col-header">' +
-      '<span class="col-title">' + title + '</span>' +
-      '<span class="col-status"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + (loading?"#EF9F27":"#1D9E75") + ';margin-right:5px"></span>' + (loading ? "Fetching..." : mins + ":" + secs) + '</span>' +
-    '</div>' +
-    (error ? '<div style="background:#1a0a0a;border:0.5px solid #5a1a1a;border-radius:8px;padding:10px 14px;margin-bottom:1rem;font-size:12px;color:#F09595">' + error + '</div>' : '') +
+    '<div class="col-header"><span class="col-title">' + title + '</span></div>' +
     '<div class="podium" style="display:flex">' + podiumHTML + '</div>' +
     '<div class="separator"></div>' +
     (restHTML ? '<div class="rest-list">' + restHTML + '</div>' : '') +
     (data && data.length === 0 ? '<div class="empty">No deals found</div>' : '') +
     '<div class="totals">' +
-      '<div class="stat-card">' +
-        '<div class="stat-label">Cash Collected</div>' +
-        '<div class="stat-row"><span class="stat-value" style="color:#1D9E75">' + (data ? fmt(totalCash) : "-") + '</span><span class="stat-goal">goal ' + fmt(goals.cash) + '</span></div>' +
-        (data ? goalBar(totalCash, goals.cash, "#1D9E75") : '') +
-      '</div>' +
-      '<div class="stat-card">' +
-        '<div class="stat-label">Deals Closed</div>' +
-        '<div class="stat-row"><span class="stat-value" style="color:#85B7EB">' + (data ? totalDeals : "-") + '</span><span class="stat-goal">goal ' + goals.deals + '</span></div>' +
-        (data ? goalBar(totalDeals, goals.deals, "#85B7EB") : '') +
-      '</div>' +
+      '<div class="stat-card"><div class="stat-label">Cash Collected</div>' +
+      '<div class="stat-row"><span class="stat-value" style="color:#1D9E75">' + (data ? fmt(totalCash) : "-") + '</span><span class="stat-goal">goal ' + fmt(goals.cash) + '</span></div>' +
+      (data ? goalBar(totalCash, goals.cash, "#1D9E75") : '') + '</div>' +
+      '<div class="stat-card"><div class="stat-label">Deals Closed</div>' +
+      '<div class="stat-row"><span class="stat-value" style="color:#85B7EB">' + (data ? totalDeals : "-") + '</span><span class="stat-goal">goal ' + goals.deals + '</span></div>' +
+      (data ? goalBar(totalDeals, goals.deals, "#85B7EB") : '') + '</div>' +
     '</div>';
 }
 
-function startCountdown(seconds) {
-  countdown = seconds;
-  if (countdownTimer) clearInterval(countdownTimer);
-  countdownTimer = setInterval(function() {
-    countdown = Math.max(0, countdown - 1);
-    if (countdown === 0) {
-      loadData();
-    } else {
-      renderColumn("col-week", "This week", window._weekData, window._weekTotals, false, window._weekError);
-      renderColumn("col-month", "This month", window._monthData, window._monthTotals, false, window._monthError);
+function renderAll(json) {
+  renderColumn("setter-col-week",  "This week",  json.setterWeek,  json.setterWeekTotals);
+  renderColumn("setter-col-month", "This month", json.setterMonth, json.setterMonthTotals);
+  renderColumn("closer-col-week",  "This week",  json.closerWeek,  json.closerWeekTotals);
+  renderColumn("closer-col-month", "This month", json.closerMonth, json.closerMonthTotals);
+}
+
+function switchBoard(board) {
+  currentBoard = board;
+  document.getElementById("dash-setter").classList.toggle("active", board === "setter");
+  document.getElementById("dash-closer").classList.toggle("active", board === "closer");
+  document.getElementById("btn-setter").classList.toggle("active", board === "setter");
+  document.getElementById("btn-closer").classList.toggle("active", board === "closer");
+  document.getElementById("board-title").textContent = board === "setter" ? "Setter leaderboard" : "Closer leaderboard";
+  var fill = document.getElementById("rotate-fill");
+  fill.style.background = board === "setter" ? "#EF9F27" : "#85B7EB";
+  resetRotateTimer();
+}
+
+function resetRotateTimer() {
+  rotateSecondsLeft = 300;
+  if (rotateTimer) clearInterval(rotateTimer);
+  var fill = document.getElementById("rotate-fill");
+  fill.style.transition = "none";
+  fill.style.width = "100%";
+  setTimeout(function() {
+    fill.style.transition = "width 1s linear";
+  }, 50);
+  rotateTimer = setInterval(function() {
+    rotateSecondsLeft--;
+    var pct = (rotateSecondsLeft / 300) * 100;
+    fill.style.width = pct + "%";
+    if (rotateSecondsLeft <= 0) {
+      switchBoard(currentBoard === "setter" ? "closer" : "setter");
     }
   }, 1000);
 }
@@ -251,24 +288,11 @@ function loadData() {
     .then(function(json) {
       if (json.updatedAt !== lastUpdatedAt) {
         lastUpdatedAt = json.updatedAt;
-        window._weekData = json.week;
-        window._monthData = json.month;
-        window._weekTotals = json.weekTotals;
-        window._monthTotals = json.monthTotals;
-        window._weekError = null;
-        window._monthError = null;
-        renderColumn("col-week", "This week", json.week, json.weekTotals, false, null);
-        renderColumn("col-month", "This month", json.month, json.monthTotals, false, null);
+        cachedData = json;
+        renderAll(json);
       }
-      startCountdown(900);
     })
-    .catch(function(e) {
-      window._weekError = e.message;
-      window._monthError = e.message;
-      renderColumn("col-week", "This week", null, null, false, e.message);
-      renderColumn("col-month", "This month", null, null, false, e.message);
-      startCountdown(900);
-    });
+    .catch(function(e) { console.error("Fetch error:", e); });
 }
 
 function manualRefresh() {
@@ -278,6 +302,7 @@ function manualRefresh() {
 
 loadData();
 setInterval(loadData, 60000);
+switchBoard("setter");
 </script>
 </body>
 </html>
