@@ -146,7 +146,7 @@ var PODIUM_CONFIG = [
 ];
 
 var currentBoard = "setter";
-var rotateSecondsLeft = 300;
+var rotateSecondsLeft = 60;
 var rotateTimer = null;
 var dataRefreshTimer = null;
 var lastUpdatedAt = null;
@@ -264,7 +264,7 @@ function switchBoard(board) {
 }
 
 function resetRotateTimer() {
-  rotateSecondsLeft = 300;
+  rotateSecondsLeft = 60;
   if (rotateTimer) clearInterval(rotateTimer);
   var fill = document.getElementById("rotate-fill");
   fill.style.transition = "none";
@@ -274,7 +274,7 @@ function resetRotateTimer() {
   }, 50);
   rotateTimer = setInterval(function() {
     rotateSecondsLeft--;
-    var pct = (rotateSecondsLeft / 300) * 100;
+    var pct = (rotateSecondsLeft / 60) * 100;
     fill.style.width = pct + "%";
     if (rotateSecondsLeft <= 0) {
       switchBoard(currentBoard === "setter" ? "closer" : "setter");
