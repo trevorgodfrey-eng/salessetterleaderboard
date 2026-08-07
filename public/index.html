@@ -96,8 +96,8 @@
 
 <script>
 var GOALS = {
-  week:  { cash: 32500, deals: 25  },
-  month: { cash: 100000, deals: 100 }
+  week:  { cash: 45000,  deals: 30  },
+  month: { cash: 180000, deals: 120 }
 };
 
 var EMOJIS = {
@@ -289,8 +289,8 @@ function loadData() {
       if (json.updatedAt !== lastUpdatedAt) {
         lastUpdatedAt = json.updatedAt;
         cachedData = json;
-        renderAll(json);
       }
+      if (cachedData) renderAll(cachedData);
     })
     .catch(function(e) { console.error("Fetch error:", e); });
 }
