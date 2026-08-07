@@ -93,7 +93,7 @@ async function getOwnerMap() {
 
 const HIDDEN_OWNERS = ["90398715", "84870321", "92723181", "93371701"];
 
-async function fetchDealsForPeriod(period) {
+async function fetchDealsForPeriod(period, groupBy) {
   const { start, end } = getPeriodRange(period);
   const { pipelineId, stageIds } = await getClosedWonStageIds(await getPipelines());
   const ownerMap = await getOwnerMap();
@@ -129,7 +129,7 @@ async function fetchDealsForPeriod(period) {
   const dealIds = allDeals.map(d => d.id);
   const batchData = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
     inputs: dealIds.map(id => ({ id })),
-    properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner", "dealstage"],
+    properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner", "dealstage", "hubspot_owner_id"],
   });
 
   const grouped = {};
@@ -138,14 +138,16 @@ async function fetchDealsForPeriod(period) {
 
   for (const deal of batchData.results || []) {
     if (!stageIds.has(deal.properties.dealstage)) continue;
-    const rawOwner = deal.properties.setter_owner || "Unknown";
-    const name = ownerMap[rawOwner] || rawOwner;
+    const rawOwner = groupBy === "closer"
+      ? deal.properties.hubspot_owner_id
+      : deal.properties.setter_owner;
     const amount = parseFloat(deal.properties.up_front_cash_collected) || 0;
     if (HIDDEN_OWNERS.includes(rawOwner)) {
       hiddenTotal += amount;
       hiddenDeals += 1;
       continue;
     }
+    const name = ownerMap[rawOwner] || rawOwner || "Unknown";
     if (!grouped[name]) grouped[name] = { name, total: 0, deals: 0 };
     grouped[name].total += amount;
     grouped[name].deals += 1;
@@ -160,30 +162,35 @@ async function refreshCache() {
   isFetching = true;
   console.log(`[${new Date().toISOString()}] Refreshing leaderboard...`);
   try {
-    const [weekResult, monthResult] = await Promise.allSettled([
-      fetchDealsForPeriod("week"),
-      fetchDealsForPeriod("month"),
+    const [swR, smR, cwR, cmR] = await Promise.allSettled([
+      fetchDealsForPeriod("week", "setter"),
+      fetchDealsForPeriod("month", "setter"),
+      fetchDealsForPeriod("week", "closer"),
+      fetchDealsForPeriod("month", "closer"),
     ]);
-    if (weekResult.status === "fulfilled" && weekResult.value) {
-      cache.week = weekResult.value.leaderboard || [];
-      cache.weekTotals = {
-        total: (weekResult.value.leaderboard || []).reduce((s,r) => s + r.total, 0) + (weekResult.value.hiddenTotal || 0),
-        deals: (weekResult.value.leaderboard || []).reduce((s,r) => s + r.deals, 0) + (weekResult.value.hiddenDeals || 0)
-      };
-      console.log(`[${new Date().toISOString()}] Week done: ${cache.week.length} setters`);
-    } else {
-      console.error(`[${new Date().toISOString()}] Week error:`, weekResult.reason?.message);
-    }
-    if (monthResult.status === "fulfilled" && monthResult.value) {
-      cache.month = monthResult.value.leaderboard || [];
-      cache.monthTotals = {
-        total: (monthResult.value.leaderboard || []).reduce((s,r) => s + r.total, 0) + (monthResult.value.hiddenTotal || 0),
-        deals: (monthResult.value.leaderboard || []).reduce((s,r) => s + r.deals, 0) + (monthResult.value.hiddenDeals || 0)
-      };
-      console.log(`[${new Date().toISOString()}] Month done: ${cache.month.length} setters`);
-    } else {
-      console.error(`[${new Date().toISOString()}] Month error:`, monthResult.reason?.message);
-    }
+
+    const toCache = (r, label) => {
+      if (r.status === "fulfilled" && r.value) {
+        console.log(`[${new Date().toISOString()}] ${label} done: ${r.value.leaderboard.length} reps`);
+        return { leaderboard: r.value.leaderboard, totals: { total: r.value.leaderboard.reduce((s,x) => s+x.total,0) + (r.value.hiddenTotal||0), deals: r.value.leaderboard.reduce((s,x) => s+x.deals,0) + (r.value.hiddenDeals||0) } };
+      }
+      console.error(`[${new Date().toISOString()}] ${label} error:`, r.reason?.message);
+      return { leaderboard: [], totals: { total: 0, deals: 0 } };
+    };
+
+    const sw = toCache(swR, "Setter week");
+    const sm = toCache(smR, "Setter month");
+    const cw = toCache(cwR, "Closer week");
+    const cm = toCache(cmR, "Closer month");
+
+    cache.setterWeek        = sw.leaderboard;
+    cache.setterWeekTotals  = sw.totals;
+    cache.setterMonth       = sm.leaderboard;
+    cache.setterMonthTotals = sm.totals;
+    cache.closerWeek        = cw.leaderboard;
+    cache.closerWeekTotals  = cw.totals;
+    cache.closerMonth       = cm.leaderboard;
+    cache.closerMonthTotals = cm.totals;
     cache.updatedAt = new Date().toISOString();
     console.log(`[${new Date().toISOString()}] Cache updated successfully.`);
   } catch (e) {
