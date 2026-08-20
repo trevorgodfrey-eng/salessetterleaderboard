@@ -124,19 +124,25 @@ async function fetchDealsForPeriod(period, groupBy) {
     }
   }
 
-  if (allDeals.length === 0) return [];
+  if (allDeals.length === 0) return { leaderboard: [], hiddenTotal: 0, hiddenDeals: 0 };
 
-  const dealIds = allDeals.map(d => d.id);
-  const batchData = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
-    inputs: dealIds.map(id => ({ id })),
-    properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner", "dealstage", "hubspot_owner_id"],
-  });
+  const BATCH_SIZE = 100;
+  const allBatchResults = [];
+  for (let i = 0; i < allDeals.length; i += BATCH_SIZE) {
+    const chunk = allDeals.slice(i, i + BATCH_SIZE);
+    if (i > 0) await new Promise(r => setTimeout(r, 500));
+    const batchData = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
+      inputs: chunk.map(d => ({ id: d.id })),
+      properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner", "dealstage", "hubspot_owner_id"],
+    });
+    allBatchResults.push(...(batchData.results || []));
+  }
 
   const grouped = {};
   let hiddenTotal = 0;
   let hiddenDeals = 0;
 
-  for (const deal of batchData.results || []) {
+  for (const deal of allBatchResults) {
     if (!stageIds.has(deal.properties.dealstage)) continue;
     const rawOwner = groupBy === "closer"
       ? deal.properties.hubspot_owner_id
@@ -154,6 +160,7 @@ async function fetchDealsForPeriod(period, groupBy) {
   }
 
   const leaderboard = Object.values(grouped).sort((a, b) => b.total - a.total);
+  console.log(`[${new Date().toISOString()}] fetchDealsForPeriod(${period}, ${groupBy}) — ${allDeals.length} raw deals, ${leaderboard.length} reps`);
   return { leaderboard, hiddenTotal, hiddenDeals };
 }
 
@@ -162,19 +169,28 @@ async function refreshCache() {
   isFetching = true;
   console.log(`[${new Date().toISOString()}] Refreshing leaderboard...`);
   try {
-    const [swR, smR, cwR, cmR] = await Promise.allSettled([
+    const [swR, smR] = await Promise.allSettled([
       fetchDealsForPeriod("week", "setter"),
       fetchDealsForPeriod("month", "setter"),
+    ]);
+    await new Promise(r => setTimeout(r, 1000));
+    const [cwR, cmR] = await Promise.allSettled([
       fetchDealsForPeriod("week", "closer"),
       fetchDealsForPeriod("month", "closer"),
     ]);
 
     const toCache = (r, label) => {
-      if (r.status === "fulfilled" && r.value) {
+      if (r.status === "fulfilled" && r.value && r.value.leaderboard) {
         console.log(`[${new Date().toISOString()}] ${label} done: ${r.value.leaderboard.length} reps`);
-        return { leaderboard: r.value.leaderboard, totals: { total: r.value.leaderboard.reduce((s,x) => s+x.total,0) + (r.value.hiddenTotal||0), deals: r.value.leaderboard.reduce((s,x) => s+x.deals,0) + (r.value.hiddenDeals||0) } };
+        return {
+          leaderboard: r.value.leaderboard,
+          totals: {
+            total: r.value.leaderboard.reduce((s,x) => s + x.total, 0) + (r.value.hiddenTotal || 0),
+            deals: r.value.leaderboard.reduce((s,x) => s + x.deals, 0) + (r.value.hiddenDeals || 0)
+          }
+        };
       }
-      console.error(`[${new Date().toISOString()}] ${label} error:`, r.reason?.message);
+      console.error(`[${new Date().toISOString()}] ${label} error:`, r.reason?.message || "Empty result");
       return { leaderboard: [], totals: { total: 0, deals: 0 } };
     };
 
