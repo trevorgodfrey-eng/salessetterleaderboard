@@ -122,7 +122,7 @@ var EMOJIS = {
 var CUSTOM_AVATARS = {
   "jeremy jimenez":    "https://i.imgur.com/oz0kL7C.gif",
   "abbey christner":   "https://i.imgflip.com/5xlk92.gif",
-  "luis rodriguez":    "https://media0.giphy.com/media/MeDCkhoxIeAhwvJdXY/200w.gif",
+  "luis rodriguez":    "https://media0.giphy.com/media/v1.Y2lkPTc5MGI3NjExZmQ5NWhyMnA4eXVsdmZjNmZpODV6c3l6azV4aWhvdWNjcmJkZmlsbSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/67ThRZlYBvibtdF9JH/giphy.gif",
   "christian wheeldon":"https://media3.giphy.com/media/VguyBLjsztRBK/giphy.gif",
   "connor huseman":    "https://media.giphy.com/media/xTiTnoORMNaANLYrHW/giphy.gif",
   "freddy cornieles":  "https://media0.giphy.com/media/MFsqcBSoOKPbjtmvWz/giphy.gif",
