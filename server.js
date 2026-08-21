@@ -1,290 +1,312 @@
-import express from "express";
-import fetch from "node-fetch";
-import path from "path";
-import { fileURLToPath } from "url";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MLP Leaderboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #000; color: #fff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height: 100vh; padding: 1.5rem; }
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
+  .header-left { display: flex; flex-direction: column; gap: 4px; }
+  .header-title { font-size: 28px; font-weight: 500; letter-spacing: -0.5px; }
+  .header-sub { font-size: 13px; color: #444; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .btn { padding: 6px 13px; font-size: 12px; border-radius: 8px; border: 0.5px solid #2a2a2a; background: transparent; color: #555; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .btn:hover { color: #aaa; border-color: #444; }
+  .btn-toggle { padding: 7px 16px; font-size: 13px; border-radius: 8px; border: 0.5px solid #333; background: #111; color: #aaa; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .btn-toggle.active { background: #1a1a1a; color: #fff; border-color: #555; }
+  .rotate-bar { height: 2px; background: #1a1a1a; border-radius: 999px; margin-bottom: 1.5rem; overflow: hidden; }
+  .rotate-fill { height: 100%; border-radius: 999px; transition: width 1s linear; }
+  .columns { display: flex; gap: 1.5rem; }
+  .col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .divider { width: 0.5px; background: #1a1a1a; flex-shrink: 0; }
+  .col-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+  .col-title { font-size: 20px; font-weight: 500; }
+  .col-status { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; }
+  .podium { display: flex; align-items: flex-end; gap: 6px; }
+  .podium-item { display: flex; flex-direction: column; align-items: center; }
+  .podium-item.p1 { flex: 1.15; order: 1; }
+  .podium-item.p2 { flex: 1; order: 0; }
+  .podium-item.p3 { flex: 1; order: 2; }
+  .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 500; flex-shrink: 0; border: 1.5px solid; overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; border-radius: 50%; }
+  .rep-name { font-weight: 500; text-align: center; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+  .rep-total { font-weight: 500; letter-spacing: -0.3px; }
+  .rep-deals { font-size: 14px; color: #888; margin-bottom: 8px; }
+  .podium-block { width: 100%; display: flex; align-items: flex-start; justify-content: center; padding-top: 10px; border-radius: 6px 6px 0 0; }
+  .podium-rank { font-weight: 500; }
+  .separator { border-top: 0.5px solid #222; margin-top: 0; }
+  .rest-list { display: flex; flex-direction: column; gap: 1px; margin: 8px 0; }
+  .rest-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 0.5px solid #1a1a1a; }
+  .rest-rank { font-size: 14px; color: #444; min-width: 28px; text-align: right; }
+  .rest-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; flex-shrink: 0; overflow: hidden; }
+  .rest-avatar img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; border-radius: 50%; }
+  .rest-info { flex: 1; min-width: 0; }
+  .rest-name { font-size: 16px; font-weight: 500; color: #ccc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+  .rest-bar-track { height: 4px; background: #222; border-radius: 999px; }
+  .rest-bar-fill { height: 100%; background: #333; border-radius: 999px; transition: width 0.6s ease; }
+  .rest-total { font-size: 16px; font-weight: 500; color: #aaa; flex-shrink: 0; }
+  .totals { margin-top: auto; padding-top: 1rem; border-top: 0.5px solid #1e1e1e; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-card { background: #111; border-radius: 10px; padding: 14px 16px; border: 0.5px solid #222; }
+  .stat-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
+  .stat-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+  .stat-value { font-size: 28px; font-weight: 500; letter-spacing: -0.5px; }
+  .stat-goal { font-size: 12px; color: #444; }
+  .goal-track { height: 6px; background: #1e1e1e; border-radius: 999px; margin-bottom: 6px; overflow: hidden; }
+  .goal-fill { height: 100%; border-radius: 999px; transition: width 0.7s ease; }
+  .goal-pct { font-size: 12px; font-weight: 500; }
+  .empty { text-align: center; color: #444; font-size: 12px; padding: 2rem 0; }
+  .dashboard { display: none; }
+  .dashboard.active { display: block; }
+  @media (max-width: 600px) { .columns { flex-direction: column; } .divider { width: 100%; height: 0.5px; } }
+</style>
+</head>
+<body>
 
-const app = express();
-const PORT = process.env.PORT || 8080;
-const HUBSPOT_TOKEN = process.env.HUBSPOT_MCP_TOKEN;
+<div class="header">
+  <div class="header-left">
+    <div class="header-title" id="board-title">Setter leaderboard</div>
+    <div class="header-sub">Closer Call Pipeline (Academy) · Closed Won · Up Front Cash Collected</div>
+  </div>
+  <div class="header-right">
+    <button class="btn-toggle active" id="btn-setter" onclick="switchBoard('setter')">Setters</button>
+    <button class="btn-toggle" id="btn-closer" onclick="switchBoard('closer')">Closers</button>
+    <button class="btn" onclick="manualRefresh()">&#x21bb;</button>
+  </div>
+</div>
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-app.use(express.static(path.join(__dirname, "public")));
+<div class="rotate-bar"><div class="rotate-fill" id="rotate-fill" style="width:100%"></div></div>
 
-let cache = { week: null, month: null, updatedAt: null };
-let isFetching = false;
+<div class="dashboard active" id="dash-setter">
+  <div class="columns">
+    <div class="col" id="setter-col-week"></div>
+    <div class="divider"></div>
+    <div class="col" id="setter-col-month"></div>
+  </div>
+</div>
 
-function isWithinSchedule() {
-  const now = new Date();
-  const day = now.getDay();
-  const hour = now.getHours();
-  return day >= 1 && day <= 5 && hour >= 8 && hour < 20;
+<div class="dashboard" id="dash-closer">
+  <div class="columns">
+    <div class="col" id="closer-col-week"></div>
+    <div class="divider"></div>
+    <div class="col" id="closer-col-month"></div>
+  </div>
+</div>
+
+<script>
+var GOALS = {
+  week:  { cash: 45000,  deals: 30  },
+  month: { cash: 180000, deals: 120 }
+};
+
+var EMOJIS = {
+  "christian wheeldon": "\uD83C\uDFB0",
+  "luis rodriguez": "\u231A\uFE0F",
+  "abbey christner": "\uD83D\uDC8E",
+  "jeremy jimenez": "\u2604\uFE0F",
+  "joey smith": "\uD83D\uDCAA\uD83C\uDFFE",
+  "connor huseman": "\uD83E\uDD76",
+  "freddy cornieles": "\uD83D\uDE80",
+  "sam hernandez": "\uD83E\uDD34\uD83C\uDFFE",
+  "eddie hannigan": "\uD83C\uDFC4\u200D\u2642\uFE0F",
+  "jaima carson": "\uD83D\uDC83",
+  "camron priest": "\uD83E\uDD76",
+  "luis izquierdo": "\uD83E\uDD89",
+  "bailey carpenter": "\uD83D\uDE42\u200D\u2194\uFE0F",
+  "eric jankowitz": "\uD83D\uDC51",
+  "jon reese": "\uD83E\uDD8D",
+  "xavier valdez": "\uD83D\uDCB8"
+};
+
+var CUSTOM_AVATARS = {
+  "jeremy jimenez":    "https://i.imgur.com/oz0kL7C.gif",
+  "abbey christner":   "https://i.imgflip.com/5xlk92.gif",
+  "luis rodriguez":    "https://media0.giphy.com/media/MeDCkhoxIeAhwvJdXY/200w.gif",
+  "christian wheeldon":"https://media3.giphy.com/media/VguyBLjsztRBK/giphy.gif",
+  "connor huseman":    "https://media.giphy.com/media/xTiTnoORMNaANLYrHW/giphy.gif",
+  "freddy cornieles":  "https://media0.giphy.com/media/MFsqcBSoOKPbjtmvWz/giphy.gif",
+  "joey smith":        "https://media3.giphy.com/media/zAqVg3rQMqbywPXc3i/giphy.gif",
+  "sam hernandez":     "https://media3.giphy.com/media/5nFShZWwq3fdm/giphy.gif",
+  "eddie hannigan":    "https://media.tenor.com/RzVm4yzxQhkAAAAM/lil-uzi-uzi.gif",
+  "jaima carson":      "https://media.giphy.com/media/UTCiBuRa7UnjW6eTX9/giphy.gif",
+  "camron priest":     "https://media2.giphy.com/media/hp8nWrUnYwgnl7YkJB/giphy.gif",
+  "luis izquierdo":    "https://media0.giphy.com/media/gTURHJs4e2Ies/giphy.gif",
+  "bailey carpenter":  "https://media.giphy.com/media/blSTtZehjAZ8I/giphy.gif",
+  "eric jankowitz":    "https://media.giphy.com/media/ASuN9noy1pySV05Qfe/giphy.gif",
+  "jon reese":         "https://media1.giphy.com/media/hVssUbnFWKjmJG7B6g/giphy.gif",
+  "xavier valdez":     "https://media.giphy.com/media/SsTcO55LJDBsI/giphy.gif"
+};
+
+var AVATAR_PALETTES = [
+  ["#2a2a2a","#EF9F27"],["#1a2a1a","#5DCAA5"],["#2a1a1a","#F0997B"],
+  ["#1a1a2a","#AFA9EC"],["#1a2218","#97C459"],["#1a1f2a","#85B7EB"]
+];
+
+var PODIUM_CONFIG = [
+  { rank:0, order:1, height:140, accent:"#EF9F27", glow:"rgba(239,159,39,0.15)", label:"1st", sz:90, fsz:28, nameFsz:22, totalFsz:32 },
+  { rank:1, order:0, height:95,  accent:"#85B7EB", glow:"rgba(133,183,235,0.12)", label:"2nd", sz:72, fsz:22, nameFsz:18, totalFsz:26 },
+  { rank:2, order:2, height:70,  accent:"#F0997B", glow:"rgba(240,153,123,0.12)", label:"3rd", sz:72, fsz:22, nameFsz:18, totalFsz:26 }
+];
+
+var currentBoard = "setter";
+var rotateSecondsLeft = 60;
+var rotateTimer = null;
+var dataRefreshTimer = null;
+var lastUpdatedAt = null;
+var cachedData = null;
+
+function displayName(name) {
+  var emoji = EMOJIS[name.toLowerCase()];
+  return emoji ? name + " " + emoji : name;
 }
 
-function getPeriodRange(period) {
-  const now = new Date();
-  const start = new Date();
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  if (period === "week") {
-    const day = now.getDay();
-    const diffToMonday = (day === 0 ? -6 : 1 - day);
-    start.setDate(now.getDate() + diffToMonday);
-    start.setHours(0, 0, 0, 0);
-  } else {
-    start.setDate(1);
-    start.setHours(0, 0, 0, 0);
-  }
-  return { start: start.getTime(), end: end.getTime() };
+function avatarColor(name) {
+  var h = 0;
+  for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AVATAR_PALETTES.length;
+  return AVATAR_PALETTES[h];
 }
 
-async function hsGet(url) {
-  const resp = await fetch(url, {
-    headers: { Authorization: `Bearer ${HUBSPOT_TOKEN}`, "Content-Type": "application/json" },
-  });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`HubSpot error ${resp.status}: ${err.slice(0, 200)}`);
-  }
-  return resp.json();
+function avatarHTML(name, size, fontSize, accentColor) {
+  var url = CUSTOM_AVATARS[name.toLowerCase()];
+  if (url) return '<div class="avatar" style="width:' + size + 'px;height:' + size + 'px;border-color:' + accentColor + ';margin-bottom:8px"><img src="' + url + '" alt="' + name + '" /></div>';
+  var colors = avatarColor(name);
+  var inits = name.split(" ").map(function(p){ return p[0]; }).join("").toUpperCase().slice(0,2);
+  return '<div class="avatar" style="width:' + size + 'px;height:' + size + 'px;font-size:' + fontSize + 'px;background:' + colors[0] + ';border-color:' + accentColor + ';color:' + colors[1] + ';margin-bottom:8px">' + inits + '</div>';
 }
 
-async function hsPost(url, body) {
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${HUBSPOT_TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`HubSpot error ${resp.status}: ${err.slice(0, 200)}`);
-  }
-  return resp.json();
+function restAvatarHTML(name) {
+  var url = CUSTOM_AVATARS[name.toLowerCase()];
+  if (url) return '<div class="rest-avatar"><img src="' + url + '" alt="' + name + '" /></div>';
+  var colors = avatarColor(name);
+  var inits = name.split(" ").map(function(p){ return p[0]; }).join("").toUpperCase().slice(0,2);
+  return '<div class="rest-avatar" style="background:' + colors[0] + ';color:' + colors[1] + '">' + inits + '</div>';
 }
 
-async function getPipelines() {
-  const data = await hsGet("https://api.hubapi.com/crm/v3/pipelines/deals");
-  return data.results || [];
+function fmt(n) {
+  return new Intl.NumberFormat("en-US", { style:"currency", currency:"USD", maximumFractionDigits:0 }).format(n);
 }
 
-async function getClosedWonStageIds(pipelines) {
-  const pipeline = pipelines.find((p) =>
-    p.label.toLowerCase().includes("closer call pipeline (academy)") ||
-    p.label.toLowerCase().includes("closer call")
-  );
-  if (!pipeline) throw new Error("Could not find 'Closer Call Pipeline (Academy)' pipeline");
-  const stages = pipeline.stages.filter((s) =>
-    s.label.toLowerCase().includes("closed won")
-  );
-  if (!stages.length) throw new Error("Could not find any Closed Won stages in pipeline");
-  console.log("Matched stages:", stages.map(s => s.label + " (" + s.id + ")"));
-  return { pipelineId: pipeline.id, stageIds: new Set(stages.map(s => s.id)) };
+function goalBar(value, goal, color) {
+  var pct = Math.min(100, Math.round((value / goal) * 100));
+  var barColor = pct >= 100 ? "#1D9E75" : pct >= 60 ? "#EF9F27" : color;
+  return '<div class="goal-track"><div class="goal-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>' +
+         '<div class="goal-pct" style="color:' + barColor + '">' + pct + '% of goal</div>';
 }
 
-async function getOwnerMap() {
-  const data = await hsGet("https://api.hubapi.com/crm/v3/owners?limit=100");
-  const map = {};
-  for (const owner of data.results || []) {
-    map[String(owner.id)] = `${owner.firstName} ${owner.lastName}`.trim();
-    if (owner.userId) map[String(owner.userId)] = `${owner.firstName} ${owner.lastName}`.trim();
-    if (owner.email) map[owner.email] = `${owner.firstName} ${owner.lastName}`.trim();
-  }
-  return map;
-}
+function renderColumn(colId, title, data, totals) {
+  var col = document.getElementById(colId);
+  if (!col) return;
+  var top = data && data.length > 0 ? data[0].total : 1;
+  var periodKey = title === "This week" ? "week" : "month";
+  var goals = GOALS[periodKey];
+  var totalCash = totals ? totals.total : (data ? data.reduce(function(s,r){ return s+r.total; }, 0) : 0);
+  var totalDeals = totals ? totals.deals : (data ? data.reduce(function(s,r){ return s+r.deals; }, 0) : 0);
 
-const HIDDEN_OWNERS = ["90398715", "84870321", "92723181", "93371701"];
-
-async function fetchDealsForPeriod(period, groupBy) {
-  const { start, end } = getPeriodRange(period);
-  const { pipelineId, stageIds } = await getClosedWonStageIds(await getPipelines());
-  const ownerMap = await getOwnerMap();
-
-  let allDeals = [];
-  let after = undefined;
-
-  while (true) {
-    const body = {
-      filterGroups: [{
-        filters: [
-          { propertyName: "pipeline", operator: "EQ", value: pipelineId },
-          { propertyName: "closedate", operator: "GTE", value: String(start) },
-          { propertyName: "closedate", operator: "LTE", value: String(end) },
-        ],
-      }],
-      properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner"],
-      limit: 100,
-      ...(after ? { after } : {}),
-    };
-
-    const data = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/search", body);
-    allDeals = allDeals.concat(data.results || []);
-    if (data.paging?.next?.after) {
-      after = data.paging.next.after;
+  var podiumHTML = "";
+  var podiumOrder = [PODIUM_CONFIG[1], PODIUM_CONFIG[0], PODIUM_CONFIG[2]];
+  podiumOrder.forEach(function(p) {
+    var rep = data && data[p.rank] ? data[p.rank] : null;
+    podiumHTML += '<div class="podium-item p' + (p.rank+1) + '" style="order:' + p.order + '">';
+    if (rep) {
+      podiumHTML += avatarHTML(rep.name, p.sz, p.fsz, p.accent);
+      podiumHTML += '<p class="rep-name" style="font-size:' + p.nameFsz + 'px;margin-bottom:2px">' + displayName(rep.name) + '</p>';
+      podiumHTML += '<p class="rep-total" style="font-size:' + p.totalFsz + 'px;color:' + p.accent + ';margin-bottom:8px">' + fmt(rep.total) + '</p>';
+      podiumHTML += '<p class="rep-deals">' + rep.deals + ' deal' + (rep.deals !== 1 ? 's' : '') + '</p>';
     } else {
-      break;
+      podiumHTML += '<div style="height:' + (p.rank===0?100:80) + 'px;display:flex;align-items:center"><p style="font-size:12px;color:#444">-</p></div>';
     }
-  }
+    podiumHTML += '<div class="podium-block" style="height:' + p.height + 'px;background:' + p.glow + ';border:0.5px solid ' + p.accent + '33">';
+    podiumHTML += '<span class="podium-rank" style="font-size:' + (p.rank===0?22:16) + 'px;color:' + p.accent + '">' + p.label + '</span></div></div>';
+  });
 
-  if (allDeals.length === 0) return { leaderboard: [], hiddenTotal: 0, hiddenDeals: 0 };
-
-  const BATCH_SIZE = 100;
-  const allBatchResults = [];
-  for (let i = 0; i < allDeals.length; i += BATCH_SIZE) {
-    const chunk = allDeals.slice(i, i + BATCH_SIZE);
-    if (i > 0) await new Promise(r => setTimeout(r, 500));
-    const batchData = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
-      inputs: chunk.map(d => ({ id: d.id })),
-      properties: ["dealname", "closedate", "up_front_cash_collected", "setter_owner", "dealstage", "hubspot_owner_id"],
+  var restHTML = "";
+  if (data && data.length > 3) {
+    data.slice(3).forEach(function(rep, i) {
+      var pct = Math.round((rep.total / top) * 100);
+      restHTML += '<div class="rest-row"><span class="rest-rank">#' + (i+4) + '</span>';
+      restHTML += restAvatarHTML(rep.name);
+      restHTML += '<div class="rest-info"><div class="rest-name">' + displayName(rep.name) + '</div>';
+      restHTML += '<div class="rest-bar-track"><div class="rest-bar-fill" style="width:' + pct + '%"></div></div></div>';
+      restHTML += '<span class="rest-total">' + fmt(rep.total) + '</span></div>';
     });
-    allBatchResults.push(...(batchData.results || []));
   }
 
-  const grouped = {};
-  let hiddenTotal = 0;
-  let hiddenDeals = 0;
-
-  for (const deal of allBatchResults) {
-    if (!stageIds.has(deal.properties.dealstage)) continue;
-    const rawOwner = groupBy === "closer"
-      ? deal.properties.hubspot_owner_id
-      : deal.properties.setter_owner;
-    const amount = parseFloat(deal.properties.up_front_cash_collected) || 0;
-    if (HIDDEN_OWNERS.includes(rawOwner)) {
-      hiddenTotal += amount;
-      hiddenDeals += 1;
-      continue;
-    }
-    const name = ownerMap[rawOwner] || rawOwner || "Unknown";
-    if (!grouped[name]) grouped[name] = { name, total: 0, deals: 0 };
-    grouped[name].total += amount;
-    grouped[name].deals += 1;
-  }
-
-  const leaderboard = Object.values(grouped).sort((a, b) => b.total - a.total);
-  console.log(`[${new Date().toISOString()}] fetchDealsForPeriod(${period}, ${groupBy}) — ${allDeals.length} raw deals, ${leaderboard.length} reps`);
-  return { leaderboard, hiddenTotal, hiddenDeals };
+  col.innerHTML =
+    '<div class="col-header"><span class="col-title">' + title + '</span></div>' +
+    '<div class="podium" style="display:flex">' + podiumHTML + '</div>' +
+    '<div class="separator"></div>' +
+    (restHTML ? '<div class="rest-list">' + restHTML + '</div>' : '') +
+    (data && data.length === 0 ? '<div class="empty">No deals found</div>' : '') +
+    '<div class="totals">' +
+      '<div class="stat-card"><div class="stat-label">Cash Collected</div>' +
+      '<div class="stat-row"><span class="stat-value" style="color:#1D9E75">' + (data ? fmt(totalCash) : "-") + '</span><span class="stat-goal">goal ' + fmt(goals.cash) + '</span></div>' +
+      (data ? goalBar(totalCash, goals.cash, "#1D9E75") : '') + '</div>' +
+      '<div class="stat-card"><div class="stat-label">Deals Closed</div>' +
+      '<div class="stat-row"><span class="stat-value" style="color:#85B7EB">' + (data ? totalDeals : "-") + '</span><span class="stat-goal">goal ' + goals.deals + '</span></div>' +
+      (data ? goalBar(totalDeals, goals.deals, "#85B7EB") : '') + '</div>' +
+    '</div>';
 }
 
-async function refreshCache() {
-  if (isFetching) return;
-  isFetching = true;
-  console.log(`[${new Date().toISOString()}] Refreshing leaderboard...`);
-  try {
-    const [swR, smR] = await Promise.allSettled([
-      fetchDealsForPeriod("week", "setter"),
-      fetchDealsForPeriod("month", "setter"),
-    ]);
-    await new Promise(r => setTimeout(r, 1000));
-    const [cwR, cmR] = await Promise.allSettled([
-      fetchDealsForPeriod("week", "closer"),
-      fetchDealsForPeriod("month", "closer"),
-    ]);
+function renderAll(json) {
+  renderColumn("setter-col-week",  "This week",  json.setterWeek,  json.setterWeekTotals);
+  renderColumn("setter-col-month", "This month", json.setterMonth, json.setterMonthTotals);
+  renderColumn("closer-col-week",  "This week",  json.closerWeek,  json.closerWeekTotals);
+  renderColumn("closer-col-month", "This month", json.closerMonth, json.closerMonthTotals);
+}
 
-    const toCache = (r, label) => {
-      if (r.status === "fulfilled" && r.value && r.value.leaderboard) {
-        console.log(`[${new Date().toISOString()}] ${label} done: ${r.value.leaderboard.length} reps`);
-        return {
-          leaderboard: r.value.leaderboard,
-          totals: {
-            total: r.value.leaderboard.reduce((s,x) => s + x.total, 0) + (r.value.hiddenTotal || 0),
-            deals: r.value.leaderboard.reduce((s,x) => s + x.deals, 0) + (r.value.hiddenDeals || 0)
-          }
-        };
+function switchBoard(board) {
+  currentBoard = board;
+  document.getElementById("dash-setter").classList.toggle("active", board === "setter");
+  document.getElementById("dash-closer").classList.toggle("active", board === "closer");
+  document.getElementById("btn-setter").classList.toggle("active", board === "setter");
+  document.getElementById("btn-closer").classList.toggle("active", board === "closer");
+  document.getElementById("board-title").textContent = board === "setter" ? "Setter leaderboard" : "Closer leaderboard";
+  var fill = document.getElementById("rotate-fill");
+  fill.style.background = board === "setter" ? "#EF9F27" : "#85B7EB";
+  resetRotateTimer();
+}
+
+function resetRotateTimer() {
+  rotateSecondsLeft = 60;
+  if (rotateTimer) clearInterval(rotateTimer);
+  var fill = document.getElementById("rotate-fill");
+  fill.style.transition = "none";
+  fill.style.width = "100%";
+  setTimeout(function() {
+    fill.style.transition = "width 1s linear";
+  }, 50);
+  rotateTimer = setInterval(function() {
+    rotateSecondsLeft--;
+    var pct = (rotateSecondsLeft / 60) * 100;
+    fill.style.width = pct + "%";
+    if (rotateSecondsLeft <= 0) {
+      switchBoard(currentBoard === "setter" ? "closer" : "setter");
+    }
+  }, 1000);
+}
+
+function loadData() {
+  fetch("/api/leaderboard")
+    .then(function(res) { return res.json(); })
+    .then(function(json) {
+      if (json.updatedAt !== lastUpdatedAt) {
+        lastUpdatedAt = json.updatedAt;
+        cachedData = json;
       }
-      console.error(`[${new Date().toISOString()}] ${label} error:`, r.reason?.message || "Empty result");
-      return { leaderboard: [], totals: { total: 0, deals: 0 } };
-    };
-
-    const sw = toCache(swR, "Setter week");
-    const sm = toCache(smR, "Setter month");
-    const cw = toCache(cwR, "Closer week");
-    const cm = toCache(cmR, "Closer month");
-
-    cache.setterWeek        = sw.leaderboard;
-    cache.setterWeekTotals  = sw.totals;
-    cache.setterMonth       = sm.leaderboard;
-    cache.setterMonthTotals = sm.totals;
-    cache.closerWeek        = cw.leaderboard;
-    cache.closerWeekTotals  = cw.totals;
-    cache.closerMonth       = cm.leaderboard;
-    cache.closerMonthTotals = cm.totals;
-    cache.updatedAt = new Date().toISOString();
-    console.log(`[${new Date().toISOString()}] Cache updated successfully.`);
-  } catch (e) {
-    console.error(`[${new Date().toISOString()}] Error:`, e.message);
-  } finally {
-    isFetching = false;
-  }
+      if (cachedData) renderAll(cachedData);
+    })
+    .catch(function(e) { console.error("Fetch error:", e); });
 }
 
-function scheduleHourlyCheck() {
-  const now = new Date();
-  const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
-  setTimeout(() => {
-    const check = () => {
-      const d = new Date();
-      if (d.getMinutes() % 15 === 0 && isWithinSchedule()) refreshCache();
-    };
-    check();
-    setInterval(check, 60000);
-  }, msUntilNextMinute);
+function manualRefresh() {
+  fetch("/api/refresh", { method: "POST" })
+    .then(function() { setTimeout(loadData, 2000); });
 }
 
-app.get("/api/debug", async (req, res) => {
-  try {
-    const pipelines = await getPipelines();
-    const { pipelineId, stageIds } = await getClosedWonStageIds(pipelines);
-    const data = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/search", {
-      filterGroups: stageIds.map(stageId => ({
-        filters: [
-          { propertyName: "pipeline", operator: "EQ", value: pipelineId },
-          { propertyName: "dealstage", operator: "EQ", value: stageId },
-        ],
-      })),
-      properties: ["dealname", "setter_owner", "up_front_cash_collected"],
-      limit: 5,
-    });
-    const dealIds = data.results.map(d => d.id);
-    const batch = await hsPost("https://api.hubapi.com/crm/v3/objects/deals/batch/read", {
-      inputs: dealIds.map(id => ({ id })),
-      properties: ["dealname", "setter_owner", "up_front_cash_collected"],
-    });
-    const owners = await hsGet("https://api.hubapi.com/crm/v3/owners?limit=100");
-    res.json({
-      sample_deals: batch.results.map(d => ({
-        name: d.properties.dealname,
-        setter_owner_raw: d.properties.setter_owner,
-        amount: d.properties.up_front_cash_collected,
-      })),
-      owners: owners.results.map(o => ({
-        id: o.id,
-        name: `${o.firstName} ${o.lastName}`.trim(),
-      })),
-    });
-  } catch (e) {
-    res.json({ error: e.message });
-  }
-});
-
-app.get("/api/deal/:id", async (req, res) => {
-  try {
-    const data = await hsGet(`https://api.hubapi.com/crm/v3/objects/deals/${req.params.id}?properties=dealname,setter_owner,up_front_cash_collected,hubspot_owner_id`);
-    res.json({ deal: data.properties });
-  } catch (e) {
-    res.json({ error: e.message });
-  }
-});
-
-app.get("/api/leaderboard", (req, res) => {
-  res.json({ ...cache, schedule: isWithinSchedule() });
-});
-
-app.post("/api/refresh", async (req, res) => {
-  res.json({ ok: true, message: "Refresh started" });
-  refreshCache();
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  refreshCache();
-  scheduleHourlyCheck();
-});
+loadData();
+setInterval(loadData, 60000);
+switchBoard("setter");
+</script>
+</body>
+</html>
